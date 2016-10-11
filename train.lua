@@ -24,9 +24,9 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --steps                 (default 1e5)       number of training steps to perform
-  --epsiUpdate            (default 1e5)       epsilon update
-  --prog_freq             (default 1e2)       frequency of progress output
-  --save_freq             (default 5e4)       the model is saved every save_freq steps
+  --epsiFreq              (default 1e5)       epsilon update
+  --progFreq              (default 1e2)       frequency of progress output
+  --saveFreq              (default 5e4)       the model is saved every save_freq steps
 
   Model parameters:
   --lstmLayers            (default 1)     number of layers of RNN / LSTM
@@ -134,7 +134,7 @@ while step < opt.steps do
       err = err + fs[1]
     end
 
-    if step % opt.prog_freq == 0 then
+    if step % opt.progFreq == 0 then
       print('==> iteration = ' .. step ..
         ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
         -- string.format(', average loss = %.2f', err) ..
@@ -143,13 +143,13 @@ while step < opt.steps do
     err = 0 -- reset error
 
     -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-    if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiUpdate) end
+    if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
 
     -- display screen
     win = image.display({image=screen, win=win, zoom=opt.zoom})
 
     -- save results if needed:
-    if step % opt.save_freq == 0 then
+    if step % opt.saveFreq == 0 then
       torch.save(opt.savedir .. '/DQN_' .. step .. ".t7", 
         {model = model, total_reward = total_reward, nrewards = nrewards})
     end
