@@ -51,7 +51,7 @@ local game_env, game_actions, agent, opt = setup(opt)
 -- set parameters and vars:
 local step = 0
 local epsilon = 1 -- ϵ-greedy action selection
-local gamma = 0.9 -- delayed reward
+local gamma = 0.9 -- discount factor
 local err = 0 -- loss function error
 local w, dE_dw
 local optimState = {
