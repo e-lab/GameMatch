@@ -24,7 +24,7 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --steps                 (default 1e5)       number of training steps to perform
-  --epsiFreq              (default 1e4)       epsilon update
+  --epsiFreq              (default 1e5)       epsilon update
   --progFreq              (default 1e2)       frequency of progress output
   --saveFreq              (default 1e4)       the model is saved every save_freq steps
 
