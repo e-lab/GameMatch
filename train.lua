@@ -16,19 +16,8 @@ opt = lapp [[
   --env_params          (default 'useRGB=true')     string of environment parameters
   --actrep              (default 1)                 how many times to repeat action
   --random_starts       (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
-<<<<<<< HEAD
   --seed                (default 1250)              initial random seed
-  
-=======
 
-  Command line options:
-  --savedir         (default './results')  subdirectory to save experiments in
-  --seed                (default 1250)     initial random seed
-  --useGPU                                 use GPU in training
-  Data parameters:
-  --dataBig                                use large dataset or reduced one
-
->>>>>>> origin/master
   Training parameters:
   -r,--learningRate       (default 0.001)     learning rate
   -d,--learningRateDecay  (default 0)         learning rate decay
