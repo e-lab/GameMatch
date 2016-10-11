@@ -33,7 +33,7 @@ opt = lapp [[
   --nSeq                  (default 19)    input video sequence lenght
 
   Display and save parameters:
-  --zoom                  (default 1)     zoom window
+  --zoom                  (default 4)     zoom window
   -v, --verbose           (default 2)     verbose output
   --display                               display stuff
   --savedir      (default './results')    subdirectory to save experiments in
