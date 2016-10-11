@@ -85,14 +85,15 @@ while step < opt.steps do
       model:zeroGradParameters()
       f = f + criterion:forward(output, target)
       local dE_dy = criterion:backward(output, target)
-      model:backward(screen,dE_dy)
+      model:backward(screen[1],dE_dy)
       dE_dw:add(opt.weightDecay, w)
       return f, dE_dw -- return f and df/dX
     end
 
     -- We are in state S
     -- use model to get next action: Q function on S to get Q values for all possible actions
-    output = model:forward(screen)
+    screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+    output = model:forward(screen_in)
     local value, action_index = output:max(1) -- select max output
     -- print(action_index:size())
     action_index = action_index[1] -- max index is next action!
@@ -102,7 +103,7 @@ while step < opt.steps do
       action_index = math.random(#game_actions) -- random action
     end
   
-    -- make the move, observe Q(S',a)
+    -- make the move:
     if not terminal then
         screen, reward, terminal = game_env:step(game_actions[action_index], true)
     else
@@ -114,12 +115,14 @@ while step < opt.steps do
     end
 
     target = output:clone() -- copy previous output as target
-
+    
+    -- observe Q(S',a)
     if not terminal then 
-      output = model:forward(screen)
+      screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+      output = model:forward(screen_in)
       value, action_index = output:max(1)
-      update = (reward + (gamma * value))
-      target[action_index[1]] = update -- target is previous output updated
+      update = reward + gamma*value
+      target[action_index[1]] = update -- target is previous output updated with reward
 
       -- then train neural net:
       _,fs = optim.adam(eval_E, w, optimState)
