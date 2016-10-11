@@ -1,20 +1,18 @@
---[[
-Copyright (c) 2014 Google Inc.
+-- Eugenio Culurciello
+-- October 2016
+-- Deep Q learning code
 
-See LICENSE file for full terms of limited license.
-]]
+-- inspired by: https://github.com/kuz/DeepMind-Atari-Deep-Q-Learner
+
 dqn = {}
 
 require 'torch'
 require 'nn'
 require 'nngraph'
--- require 'nnutils'
 require 'image'
 require 'model'
--- require 'Scale'
--- require 'NeuralQLearner'
--- require 'TransitionTable'
--- require 'Rectifier'
+require 'optim'
+
 
 
 function torchSetup(_opt)
@@ -41,7 +39,6 @@ function torchSetup(_opt)
     end
 
     --- general setup
-    torch.setdefaulttensortype('torch.FloatTensor')
     if not opt.threads then
         opt.threads = 8
     end
@@ -68,26 +65,6 @@ function torchSetup(_opt)
         opt.gpu = -1
         if opt.verbose >= 1 then
             print('Using CPU code only. GPU device id:', opt.gpu)
-        end
-    end
-
-    --- set up random number generators
-    -- removing lua RNG; seeding torch RNG with opt.seed and setting cutorch
-    -- RNG seed to the first uniform random int32 from the previous RNG;
-    -- this is preferred because using the same seed for both generators
-    -- may introduce correlations; we assume that both torch RNGs ensure
-    -- adequate dispersion for different seeds.
-    math.random = nil
-    opt.seed = opt.seed or 1
-    torch.manualSeed(opt.seed)
-    if opt.verbose >= 1 then
-        print('Torch Seed:', torch.initialSeed())
-    end
-    local firstRandInt = torch.random()
-    if opt.gpu >= 0 then
-        cutorch.manualSeed(firstRandInt)
-        if opt.verbose >= 1 then
-            print('CUTorch Seed:', cutorch.initialSeed())
         end
     end
 
