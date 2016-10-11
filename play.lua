@@ -33,12 +33,20 @@ cmd:option('-seed', 1, 'fixed input seed for repeatable experiments')
 cmd:option('-verbose', 2,
            'the higher the level, the more information is printed to screen')
 cmd:option('-threads', 8, 'number of BLAS threads')
-cmd:option('-gpu', -1, 'gpu flag')
+cmd:option('-gpu', 1, 'gpu flag')
 cmd:option('-gif_file', '', 'GIF path to write session screens')
 cmd:option('-csv_file', '', 'CSV path to write session data')
-
-cmd:option('-zoom', '4', 'zoom window')
-
+--Frame option for size default is match with DeepMind Q learning
+--Default img size is 3 x 210 x 160
+cmd:option('-zoom', '1', 'zoom window')
+cmd:option('-pool_frms_size',2,'frms_size')
+cmd:option('-poolfrms_type','\"max\"','frame option')
+--Save frame info
+cmd:option('-filePath', 'frames.t7', 'filePath')
+cmd:option('-size',50,'iteration size')
+cmd:option('-seq',20,'seqence size')
+cmd:option('-freq',20,'Sample frequency size')
+--Option for save
 cmd:text()
 
 local opt = cmd:parse(arg)
@@ -88,27 +96,84 @@ local keyPress = 2
 print("Started playing...")
 
 -- play one episode (game)
+frame  = 0
+file  = {}
+frames = {}
+save = true
+--Get sampling option from opt
+filePath = opt.filePath
+size = opt.size
+seq     = opt.seq
+freq    = opt.freq
+maxFram = size*seq*freq
+container = torch.FloatTensor(size,seq,3,210,160):fill(0)
 function main()
 -- while not terminal do
     -- if action was chosen randomly, Q-value is 0
     -- agent.bestq = 0
-    
+
     -- choose the best action
     local action_index = keyPress --2+torch.random(2)
     -- local action_index = agent:perceive(reward, screen, terminal, true, 0.05)
 
     -- play game in test mode (episodes don't end when losing a life)
     -- reward = score added, terminal = end of game (all lives gone)
-    screen, reward, terminal = game_env:step(game_actions[action_index], false)
+    if action_index == 1 or idx == size then save = false print('Stop sampling') end
+    if save then
+       screen, reward, terminal = game_env:step(game_actions[action_index], false)
+       --Count frame number
+       frame = frame+1
+       print(frame)
+       --Save frame based on freq and seq and maxFrm
+       if frame ~= maxFram then
+          if frame % freq == 0 then
+             sampleFrame = math.floor(frame/freq)
+             idx    = math.floor(sampleFrame / seq) + 1
+             seqIdx = math.floor(sampleFrame % seq) + 1
+             print('idx: ' , idx)
+             print('seqIdx : ',seqIdx)
+             container[idx][seqIdx] = screen:squeeze():float()
+             --Save reward and terminal along with screen
+             frames[seqIdx] = {action_index, reward, terminal}
+             --Save to table with seq
+             if sampleFrame %  seq == 0 then
+                file[idx-1] = frames
+                frames = {}
+             end
+          elseif reward > 0 then
+             sampleFrame = math.floor(frame/freq)
+             idx    = math.floor(sampleFrame / seq) + 1
+             seqIdx = math.floor(sampleFrame % seq) + 1
+             print('idx: ' , idx)
+             print('seqIdx : ',seqIdx)
+             container[idx][seqIdx] = screen:squeeze():float()
+             --Save reward and terminal along with screen
+             frames[seqIdx] = {action_index, reward, terminal}
+             --Save to table with seq
+             if sampleFrame %  seq == 0 then
+                file[idx-1] = frames
+                frames = {}
+             end
+          end
+       else
+          save = false
+       end
+    end
     -- print(reward, terminal)
 
     -- display screen
     image.display({image=screen, win=win, zoom=opt.zoom})
+    if not save then
+       print ('save frames')
+       table.insert(file,container)
+       torch.save(filePath,file)
+       qt.disconnect(qtimer,'timeout()',main)
+    end
 
     -- create gd image from tensor
     -- jpg = image.compressJPG(screen:squeeze(), 100)
     -- im = gd.createFromJpegStr(jpg:storage():string())
-    
+
     -- use palette from previous (first) image
     -- im:trueColorToPalette(false, 256)
     -- im:paletteCopy(previm)
@@ -117,7 +182,6 @@ function main()
     -- im:gifAnimAdd(gif_filename, false, 0, 0, 7, gd.DISPOSAL_NONE)
     -- remember previous screen for optimal compression
     -- previm = im
-
 end
 
 -- end GIF animation and close CSV file
@@ -141,7 +205,7 @@ qt.connect(win.listener,
                 keyPress = 4
             elseif keyValue == 'Key_X' then
                 keyPress = 1
-            else 
+            else
                 keyPress = 2
             end
             qtimer:start()

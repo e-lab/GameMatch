@@ -8,7 +8,7 @@ require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
 
-  Game options: 
+  Game options:
   --framework           (default 'alewrap')         name of training framework
   --env                 (default 'breakout')        name of environment to use')
   --game_path           (default 'roms/')           path to environment file (ROM)
@@ -22,7 +22,7 @@ opt = lapp [[
   --useGPU                                 use GPU in training
   Data parameters:
   --dataBig                                use large dataset or reduced one
-  
+
   Training parameters:
   -r,--learningRate       (default 0.001)  learning rate
   -d,--learningRateDecay  (default 0)      learning rate decay
@@ -33,9 +33,9 @@ opt = lapp [[
   Model parameters:
   --lstmLayers            (default 1)     number of layers of RNN / LSTM
   --nSeq                  (default 19)    input video sequence lenght
-  
+
   Display and save parameters:
-  --zoom                  (default 4)     zoom window
+  --zoom                  (default 1)     zoom window
   -v, --verbose           (default 2)     verbose output
   --display                               display stuff
   -s,--save                               save models
@@ -85,7 +85,7 @@ while step < opt.steps do
             screen, reward, terminal = game_env:newGame()
         end
     end
-    
+
     -- display screen
     win = image.display({image=screen, win=win, zoom=opt.zoom})
 
