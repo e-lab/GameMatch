@@ -28,6 +28,8 @@ opt = lapp [[
   -m,--momentum           (default 0.9)       momentum parameter
   --steps                 (default 1e5)       number of training steps to perform
   --epsiUpdate            (default 1e5)       epsilon update
+  --prog_freq             (default 1e2)       frequency of progress output
+  --save_freq             (default 5e4)       the model is saved every save_freq steps
 
   Model parameters:
   --lstmLayers            (default 1)     number of layers of RNN / LSTM
@@ -60,6 +62,8 @@ local optimState = {
   momentum = opt.momentum,
   learningRateDecay = opt.learningRateDecay
 }
+local total_reward = 0
+local nrewards = 0
 
 -- start a new game, here screen == state
 local screen, reward, terminal = game_env:getState()
@@ -113,6 +117,10 @@ while step < opt.steps do
             screen, reward, terminal = game_env:newGame()
         end
     end
+    if reward ~= 0 then 
+      nrewards = nrewards + 1
+      total_reward = total_reward + reward
+    end 
 
     target = output:clone() -- copy previous output as target
     
@@ -129,8 +137,12 @@ while step < opt.steps do
       err = err + fs[1]
     end
 
-    print('==> iteration = ' .. step .. ', average loss = ' .. err .. 
-          ', epsilon ' .. epsilon .. ', lr '..opt.learningRate )
+    if step % opt.prog_freq == 0 then
+      print('==> iteration = ' .. step ..
+        ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
+        -- string.format(', average loss = %.2f', err) .. 
+        string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate )
+    end
     err = 0 -- reset error
 
     -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
