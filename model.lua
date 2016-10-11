@@ -1,3 +1,7 @@
+-- Eugenio Culurciello
+-- October 2016
+-- Deep Q learning code
+
 require 'nn'
 
 function createModel (n_actions)

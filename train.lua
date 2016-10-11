@@ -1,5 +1,6 @@
 -- Eugenio Culurciello
 -- October 2016
+-- Deep Q learning code
 
 if not dqn then
     require "initenv"
@@ -26,7 +27,7 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --steps                 (default 1e5)       number of training steps to perform
-  --epsiUpdate            (default 1e3)       epsilon update
+  --epsiUpdate            (default 1e5)       epsilon update
 
   Model parameters:
   --lstmLayers            (default 1)     number of layers of RNN / LSTM
@@ -95,14 +96,11 @@ while step < opt.steps do
     local value, action_index = output:max(1) -- select max output
     -- print(action_index:size())
     action_index = action_index[1] -- max index is next action!
-    -- print(action_index)
 
     -- at random chose random action or action from neural net: best action from Q(S,a)
-    if torch.random() < epsilon then
-      action_index = torch.random(#game_actions) -- random action
-    -- else action from neural net
+    if math.random() < epsilon then
+      action_index = math.random(#game_actions) -- random action
     end
-
   
     -- make the move, observe Q(S',a)
     if not terminal then
@@ -122,9 +120,6 @@ while step < opt.steps do
       value, action_index = output:max(1)
       update = (reward + (gamma * value))
       target[action_index[1]] = update -- target is previous output updated
-
-
-      print(output, target)
 
       -- then train neural net:
       _,fs = optim.adam(eval_E, w, optimState)
