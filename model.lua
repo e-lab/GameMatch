@@ -19,5 +19,7 @@ function createModel (n_actions)
    net:add(nn.ReLU())
    net:add(nn.Linear(512, n_actions))
 
-   return net
+   local criterion = nn.MSECriterion()
+
+   return net, criterion
 end
