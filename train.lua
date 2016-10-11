@@ -9,15 +9,26 @@ require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
 
-  Game options: 
+  Game options:
   --framework           (default 'alewrap')         name of training framework
   --env                 (default 'breakout')        name of environment to use')
   --game_path           (default 'roms/')           path to environment file (ROM)
   --env_params          (default 'useRGB=true')     string of environment parameters
   --actrep              (default 1)                 how many times to repeat action
   --random_starts       (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
+<<<<<<< HEAD
   --seed                (default 1250)              initial random seed
   
+=======
+
+  Command line options:
+  --savedir         (default './results')  subdirectory to save experiments in
+  --seed                (default 1250)     initial random seed
+  --useGPU                                 use GPU in training
+  Data parameters:
+  --dataBig                                use large dataset or reduced one
+
+>>>>>>> origin/master
   Training parameters:
   -r,--learningRate       (default 0.001)     learning rate
   -d,--learningRateDecay  (default 0)         learning rate decay
@@ -31,9 +42,9 @@ opt = lapp [[
   Model parameters:
   --lstmLayers            (default 1)     number of layers of RNN / LSTM
   --nSeq                  (default 19)    input video sequence lenght
-  
+
   Display and save parameters:
-  --zoom                  (default 4)     zoom window
+  --zoom                  (default 1)     zoom window
   -v, --verbose           (default 2)     verbose output
   --display                               display stuff
   --savedir      (default './results')    subdirectory to save experiments in
@@ -74,7 +85,7 @@ print('Number of parameters ' .. w:nElement())
 print('Number of grads ' .. dE_dw:nElement())
 
 
--- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/ 
+-- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 print("Started training...")
 local win = nil
 while step < opt.steps do
@@ -103,7 +114,7 @@ while step < opt.steps do
     if math.random() < epsilon then
       action_index = math.random(#game_actions) -- random action
     end
-  
+
     -- make the move:
     if not terminal then
         screen, reward, terminal = game_env:step(game_actions[action_index], true)
@@ -114,15 +125,15 @@ while step < opt.steps do
             screen, reward, terminal = game_env:newGame()
         end
     end
-    if reward ~= 0 then 
+    if reward ~= 0 then
       nrewards = nrewards + 1
       total_reward = total_reward + reward
-    end 
+    end
 
     target = output:clone() -- copy previous output as target
-    
+
     -- observe Q(S',a)
-    if not terminal then 
+    if not terminal then
       screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
       output = model:forward(screen_in)
       value, action_index = output:max(1)
@@ -137,7 +148,7 @@ while step < opt.steps do
     if step % opt.prog_freq == 0 then
       print('==> iteration = ' .. step ..
         ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
-        -- string.format(', average loss = %.2f', err) .. 
+        -- string.format(', average loss = %.2f', err) ..
         string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate )
     end
     err = 0 -- reset error
