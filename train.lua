@@ -16,10 +16,7 @@ opt = lapp [[
   --env_params          (default 'useRGB=true')     string of environment parameters
   --actrep              (default 1)                 how many times to repeat action
   --random_starts       (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
-
-  Command line options:
-  --savedir         (default './results')     subdirectory to save experiments in
-  --seed                (default 1250)        initial random seed
+  --seed                (default 1250)              initial random seed
   
   Training parameters:
   -r,--learningRate       (default 0.001)     learning rate
@@ -39,13 +36,13 @@ opt = lapp [[
   --zoom                  (default 4)     zoom window
   -v, --verbose           (default 2)     verbose output
   --display                               display stuff
-  -s,--save                               save models
-  --savePics                              save output images examples
+  --savedir      (default './results')    subdirectory to save experiments in
 ]]
 
 
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
+os.execute('mkdir '..opt.savedir)
 
 --- General setup.
 local game_env, game_actions, agent, opt = setup(opt)
@@ -150,6 +147,12 @@ while step < opt.steps do
 
     -- display screen
     win = image.display({image=screen, win=win, zoom=opt.zoom})
+
+    -- save results if needed:
+    if step % opt.save_freq == 0 then
+      torch.save(opt.savedir .. '/DQN_' .. step .. ".t7", 
+        {model = model, total_reward = total_reward, nrewards = nrewards})
+    end
 
     if step%1000 == 0 then collectgarbage() end
 end
