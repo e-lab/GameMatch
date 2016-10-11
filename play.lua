@@ -42,10 +42,11 @@ cmd:option('-zoom', '1', 'zoom window')
 cmd:option('-pool_frms_size',2,'frms_size')
 cmd:option('-poolfrms_type','\"max\"','frame option')
 --Save frame info
-cmd:option('-filePath', 'frames.t7', 'filePath')
+cmd:option('-saveImg',true,'Save image under frames')
+cmd:option('-filePath', 'save', 'filePath')
 cmd:option('-size',50,'iteration size')
 cmd:option('-seq',20,'seqence size')
-cmd:option('-freq',20,'Sample frequency size')
+cmd:option('-freq',4,'Sample frequency size')
 --Option for save
 cmd:text()
 
@@ -106,7 +107,7 @@ size = opt.size
 seq     = opt.seq
 freq    = opt.freq
 maxFram = size*seq*freq
-container = torch.FloatTensor(size,seq,3,210,160):fill(0)
+container = torch.ByteTensor(size,seq,3,210,160):fill(0)
 function main()
 -- while not terminal do
     -- if action was chosen randomly, Q-value is 0
@@ -132,7 +133,12 @@ function main()
              seqIdx = math.floor(sampleFrame % seq) + 1
              print('idx: ' , idx)
              print('seqIdx : ',seqIdx)
-             container[idx][seqIdx] = screen:squeeze():float()
+             screen = screen:squeeze():byte()
+             if opt.saveImg then
+                imgName = './save/frames/'..tostring(idx)..'_'..tostring(seqIdx)..'.png'
+                image.save(imgName,screen)
+             end
+             container[idx][seqIdx] = screen
              --Save reward and terminal along with screen
              frames[seqIdx] = {action_index, reward, terminal}
              --Save to table with seq
@@ -146,7 +152,12 @@ function main()
              seqIdx = math.floor(sampleFrame % seq) + 1
              print('idx: ' , idx)
              print('seqIdx : ',seqIdx)
-             container[idx][seqIdx] = screen:squeeze():float()
+             screen = screen:squeeze():byte()
+             if opt.saveImg then
+                imgName = './save/frames/'..tostring(idx)..'_'..tostring(seqIdx)..'.png'
+                image.save(imgName,screen)
+             end
+             container[idx][seqIdx] = screen
              --Save reward and terminal along with screen
              frames[seqIdx] = {action_index, reward, terminal}
              --Save to table with seq
@@ -165,8 +176,8 @@ function main()
     image.display({image=screen, win=win, zoom=opt.zoom})
     if not save then
        print ('save frames')
-       table.insert(file,container)
-       torch.save(filePath,file)
+       torch.save(filePath..'/actionTable.t7',file)
+       torch.save(filePath..'/frameTensor.t7',container)
        qt.disconnect(qtimer,'timeout()',main)
     end
 
