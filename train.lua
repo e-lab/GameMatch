@@ -101,97 +101,102 @@ if opt.useGPU then
 end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
-print("Started training...")
 local win = nil
+local input, output, target, value, action_index
+local buffer = {} -- Experience Replay buffer
+
+print("Started training...")
 while step < opt.steps do
-  local input, output, target, value, action_index
-    step = step + 1
+  step = step + 1
+  sys.tic()
 
-    -- learning function for neural net:
-    local eval_E = function(w)
-      local f = 0
-      model:zeroGradParameters()
-      f = f + criterion:forward(output, target)
-      local dE_dy = criterion:backward(output, target)
-      model:backward(input,dE_dy)
-      dE_dw:add(opt.weightDecay, w)
-      return f, dE_dw -- return f and df/dX
-    end
+  -- learning function for neural net:
+  local eval_E = function(w)
+    local f = 0
+    model:zeroGradParameters()
+    f = f + criterion:forward(output, target)
+    local dE_dy = criterion:backward(output, target)
+    model:backward(input,dE_dy)
+    dE_dw:add(opt.weightDecay, w)
+    return f, dE_dw -- return f and df/dX
+  end
 
-    local function modelEval()
-        input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
-        if opt.useGPU then input = input:cuda() end
-        output = model:forward(input)
-    end
+  local function modelEval()
+      input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+      if opt.useGPU then input = input:cuda() end
+      output = model:forward(input)
+  end
 
-    local function QLearn()
-      target = output:clone() -- copy previous output as target
+  local function QLearn()
+    target = output:clone() -- copy previous output as target
 
-      -- observe Q(S',a)
-      if not terminal then
-        modelEval()
-        value, action_index = output:max(1)
-        update = reward + gamma*value
-        target[action_index[1]] = update -- target is previous output updated with reward
-
-        -- then train neural net:
-        _,fs = optim.adam(eval_E, w, optimState)
-        err = err + fs[1]
-      end
-    end
-        
-    -- We are in state S
-    -- use model to get next action: Q function on S to get Q values for all possible actions
-    modelEval()
-
-    -- at random chose random action or action from neural net: best action from Q(S,a)
-    if math.random() < epsilon then
-      action_index = math.random(#game_actions) -- random action
-    else
-      value, action_index = output:max(1) -- select max output
-      action_index = action_index[1] -- select action from neural net
-    end
-
-    -- make the move:
+    -- observe Q(S',a)
     if not terminal then
-        screen, reward, terminal = game_env:step(game_actions[action_index], true)
-    else
-        if opt.random_starts > 0 then
-            screen, reward, terminal = game_env:nextRandomGame()
-        else
-            screen, reward, terminal = game_env:newGame()
-        end
+      modelEval()
+      value, action_index = output:max(1)
+      update = reward + gamma*value
+      target[action_index[1]] = update -- target is previous output updated with reward
+
+      -- then train neural net:
+      _,fs = optim.adam(eval_E, w, optimState)
+      err = err + fs[1]
     end
-    if reward ~= 0 then
-      nrewards = nrewards + 1
-      total_reward = total_reward + reward
-    end
+  end
+      
+  -- We are in state S
+  -- use model to get next action: Q function on S to get Q values for all possible actions
+  modelEval()
 
-    -- Q-learning updates every few steps:
-    if step % opt.update_freq == 0 then
-      QLearn()
-    end
+  -- at random chose random action or action from neural net: best action from Q(S,a)
+  if math.random() < epsilon then
+    action_index = math.random(#game_actions) -- random action
+  else
+    value, action_index = output:max(1) -- select max output
+    action_index = action_index[1] -- select action from neural net
+  end
 
-    if step % opt.progFreq == 0 then
-      print('==> iteration = ' .. step ..
-        ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
-        -- string.format(', average loss = %.2f', err) ..
-        string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate )
-    end
-    err = 0 -- reset error
+  -- make the move:
+  if not terminal then
+      screen, reward, terminal = game_env:step(game_actions[action_index], true)
+  else
+      if opt.random_starts > 0 then
+          screen, reward, terminal = game_env:nextRandomGame()
+      else
+          screen, reward, terminal = game_env:newGame()
+      end
+  end
+  if reward ~= 0 then
+    nrewards = nrewards + 1
+    total_reward = total_reward + reward
+  end
 
-    -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-    if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
+  -- Q-learning updates every few steps:
+  if step % opt.update_freq == 0 then
+    QLearn()
+  end
 
-    -- display screen
-    if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
+  if step % opt.progFreq == 0 then
+    print('==> iteration = ' .. step ..
+      ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
+      -- string.format(', average loss = %.2f', err) ..
+      string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate ..
+      string.format(', step time %.4f [ms]', sys.toc()/1000) 
+    )
+  end
+  err = 0 -- reset error
 
-    -- save results if needed:
-    if step % opt.saveFreq == 0 then
-      torch.save(opt.savedir .. '/DQN_' .. step .. ".t7", 
-        {model = model, total_reward = total_reward, nrewards = nrewards})
-    end
+  -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
+  if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
 
-    if step%1000 == 0 then collectgarbage() end
+  -- display screen
+  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
+
+  -- save results if needed:
+  if step % opt.saveFreq == 0 then
+    torch.save(opt.savedir .. '/DQN_' .. step .. ".t7", 
+      {model = model, total_reward = total_reward, nrewards = nrewards})
+  end
+
+  if step%1000 == 0 then collectgarbage() end
 end
 print('Finished training!')
