@@ -146,7 +146,7 @@ while step < opt.steps do
     if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
 
     -- display screen
-    if opt.display then win = image.display({image=screen_in, win=win, zoom=opt.zoom}) end
+    if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
 
     -- save results if needed:
     if step % opt.saveFreq == 0 then
