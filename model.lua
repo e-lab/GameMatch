@@ -17,10 +17,10 @@ function createModel (n_actions)
    net:add(nn.SpatialMaxPooling(2,2,2,2))
    net:add(nn.ReLU())
 
-   net:add(nn.SpatialAveragePooling(4,4))
+   -- net:add(nn.SpatialAveragePooling(4,4))
 
-   net:add(nn.View(64))
-   net:add(nn.Linear(64, 32))
+   net:add(nn.View(64*4*4))
+   net:add(nn.Linear(64*4*4, 32))
    net:add(nn.ReLU())
    net:add(nn.Linear(32, n_actions))
 
