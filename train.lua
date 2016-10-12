@@ -97,7 +97,7 @@ end
 print("Started training...")
 local win = nil
 while step < opt.steps do
-  local input, output, target
+  local input, output, target, value, action_index
     step = step + 1
 
     -- learning function for neural net:
@@ -116,13 +116,13 @@ while step < opt.steps do
     input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
     if opt.useGPU then input = input:cuda() end
     output = model:forward(input)
-    local value, action_index = output:max(1) -- select max output
-    -- print(action_index:size())
-    action_index = action_index[1] -- max index is next action!
 
     -- at random chose random action or action from neural net: best action from Q(S,a)
     if math.random() < epsilon then
       action_index = math.random(#game_actions) -- random action
+    else
+      value, action_index = output:max(1) -- select max output
+      action_index = action_index[1] -- select action from neural net
     end
 
     -- make the move:
