@@ -14,6 +14,8 @@ opt = lapp [[
   --env                 (default 'breakout')        name of environment to use')
   --game_path           (default 'roms/')           path to environment file (ROM)
   --env_params          (default 'useRGB=true')     string of environment parameters
+  --pool_frms_type      (default 'max')             pool inputs frames mode
+  --pool_frms_size      (default '2')                 pool inputs frames size
   --actrep              (default 1)                 how many times to repeat action
   --random_starts       (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
   --gamma               (default 0.975)             discount factor in learning
@@ -43,6 +45,9 @@ opt = lapp [[
   --savedir      (default './results')    subdirectory to save experiments in
 ]]
 
+-- format options:
+opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
+
 if opt.verbose >= 1 then
     print('Using options:')
     for k, v in pairs(opt) do
@@ -55,9 +60,8 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
---- General setup.
+--- General setup:
 local game_env, game_actions, agent, opt = setup(opt)
--- print(game_env, #game_actions, agent, opt)
 
 -- set parameters and vars:
 local step = 0
