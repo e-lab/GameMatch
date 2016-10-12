@@ -180,7 +180,7 @@ while step < opt.steps do
       ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
       -- string.format(', average loss = %.2f', err) ..
       string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate ..
-      string.format(', step time %.4f [ms]', sys.toc()/1000) 
+      string.format(', step time %.2f [ms]', sys.toc()*1000) 
     )
   end
   err = 0 -- reset error
