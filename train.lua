@@ -28,7 +28,8 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-
+  --batchSize             (default 128)       batch size for training
+  --ERBuffer              (default 1024)      Experience Replay buffer memory
   --update_freq           (default 4)         learn every update_freq steps of game
   --steps                 (default 1e5)       number of training steps to perform
   --epsiFreq              (default 1e5)       epsilon update
