@@ -117,12 +117,31 @@ while step < opt.steps do
       return f, dE_dw -- return f and df/dX
     end
 
+    local function modelEval()
+        input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+        if opt.useGPU then input = input:cuda() end
+        output = model:forward(input)
+    end
+
+    local function QLearn()
+      target = output:clone() -- copy previous output as target
+
+      -- observe Q(S',a)
+      if not terminal then
+        modelEval()
+        value, action_index = output:max(1)
+        update = reward + gamma*value
+        target[action_index[1]] = update -- target is previous output updated with reward
+
+        -- then train neural net:
+        _,fs = optim.adam(eval_E, w, optimState)
+        err = err + fs[1]
+      end
+    end
         
     -- We are in state S
     -- use model to get next action: Q function on S to get Q values for all possible actions
-    input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
-    if opt.useGPU then input = input:cuda() end
-    output = model:forward(input)
+    modelEval()
 
     -- at random chose random action or action from neural net: best action from Q(S,a)
     if math.random() < epsilon then
@@ -149,23 +168,7 @@ while step < opt.steps do
 
     -- Q-learning updates every few steps:
     if step % opt.update_freq == 0 then
-    
-      target = output:clone() -- copy previous output as target
-
-      -- observe Q(S',a)
-      if not terminal then
-        input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
-        if opt.useGPU then input = input:cuda() end
-        output = model:forward(input)
-        value, action_index = output:max(1)
-        update = reward + gamma*value
-        target[action_index[1]] = update -- target is previous output updated with reward
-
-        -- then train neural net:
-        _,fs = optim.adam(eval_E, w, optimState)
-        err = err + fs[1]
-      end
-
+      QLearn()
     end
 
     if step % opt.progFreq == 0 then
