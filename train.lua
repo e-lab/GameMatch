@@ -28,6 +28,8 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
+
+  --update_freq           (default 4)         learn every update_freq steps of game
   --steps                 (default 1e5)       number of training steps to perform
   --epsiFreq              (default 1e5)       epsilon update
   --progFreq              (default 1e2)       frequency of progress output
@@ -115,6 +117,7 @@ while step < opt.steps do
       return f, dE_dw -- return f and df/dX
     end
 
+        
     -- We are in state S
     -- use model to get next action: Q function on S to get Q values for all possible actions
     input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
@@ -144,20 +147,25 @@ while step < opt.steps do
       total_reward = total_reward + reward
     end
 
-    target = output:clone() -- copy previous output as target
+    -- Q-learning updates every few steps:
+    if step % opt.update_freq == 0 then
+    
+      target = output:clone() -- copy previous output as target
 
-    -- observe Q(S',a)
-    if not terminal then
-      input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
-      if opt.useGPU then input = input:cuda() end
-      output = model:forward(input)
-      value, action_index = output:max(1)
-      update = reward + gamma*value
-      target[action_index[1]] = update -- target is previous output updated with reward
+      -- observe Q(S',a)
+      if not terminal then
+        input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+        if opt.useGPU then input = input:cuda() end
+        output = model:forward(input)
+        value, action_index = output:max(1)
+        update = reward + gamma*value
+        target[action_index[1]] = update -- target is previous output updated with reward
 
-      -- then train neural net:
-      _,fs = optim.adam(eval_E, w, optimState)
-      err = err + fs[1]
+        -- then train neural net:
+        _,fs = optim.adam(eval_E, w, optimState)
+        err = err + fs[1]
+      end
+
     end
 
     if step % opt.progFreq == 0 then
