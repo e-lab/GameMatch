@@ -97,6 +97,7 @@ end
 print("Started training...")
 local win = nil
 while step < opt.steps do
+  local input, output, target
     step = step + 1
 
     -- learning function for neural net:
@@ -105,16 +106,16 @@ while step < opt.steps do
       model:zeroGradParameters()
       f = f + criterion:forward(output, target)
       local dE_dy = criterion:backward(output, target)
-      model:backward(screen_in,dE_dy)
+      model:backward(input,dE_dy)
       dE_dw:add(opt.weightDecay, w)
       return f, dE_dw -- return f and df/dX
     end
 
     -- We are in state S
     -- use model to get next action: Q function on S to get Q values for all possible actions
-    screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
-    if opt.useGPU then screen_in = screen_in:cuda() end
-    output = model:forward(screen_in)
+    input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+    if opt.useGPU then input = input:cuda() end
+    output = model:forward(input)
     local value, action_index = output:max(1) -- select max output
     -- print(action_index:size())
     action_index = action_index[1] -- max index is next action!
@@ -143,9 +144,9 @@ while step < opt.steps do
 
     -- observe Q(S',a)
     if not terminal then
-      screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
-      if opt.useGPU then screen_in = screen_in:cuda() end
-      output = model:forward(screen_in)
+      input = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+      if opt.useGPU then input = input:cuda() end
+      output = model:forward(input)
       value, action_index = output:max(1)
       update = reward + gamma*value
       target[action_index[1]] = update -- target is previous output updated with reward
