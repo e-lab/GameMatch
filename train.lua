@@ -41,6 +41,13 @@ opt = lapp [[
   --savedir      (default './results')    subdirectory to save experiments in
 ]]
 
+if opt.verbose >= 1 then
+    print('Using options:')
+    for k, v in pairs(opt) do
+        print(k, v)
+    end
+end
+
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
