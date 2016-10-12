@@ -38,36 +38,6 @@ function torchSetup(_opt)
         end
     end
 
-    --- general setup
-    if not opt.threads then
-        opt.threads = 8
-    end
-    torch.setnumthreads(opt.threads)
-    if not opt.verbose then
-        opt.verbose = 10
-    end
-    if opt.verbose >= 1 then
-        print('Torch Threads:', torch.getnumthreads())
-    end
-
-    --- set gpu device
-    if opt.gpu and opt.gpu >= 0 then
-        require 'cutorch'
-        require 'cunn'
-        if opt.gpu == 0 then
-            local gpu_id = tonumber(os.getenv('GPU_ID'))
-            if gpu_id then opt.gpu = gpu_id+1 end
-        end
-        if opt.gpu > 0 then cutorch.setDevice(opt.gpu) end
-        opt.gpu = cutorch.getDevice()
-        print('Using GPU device id:', opt.gpu-1)
-    else
-        opt.gpu = -1
-        if opt.verbose >= 1 then
-            print('Using CPU code only. GPU device id:', opt.gpu)
-        end
-    end
-
     return opt
 end
 

@@ -16,9 +16,10 @@ opt = lapp [[
   --env_params          (default 'useRGB=true')     string of environment parameters
   --actrep              (default 1)                 how many times to repeat action
   --random_starts       (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
-  --seed                (default 1250)              initial random seed
-
+  
   Training parameters:
+  --threads               (default 8)         number of threads used by BLAS routines
+  --seed                  (default 1250)      initial random seed
   -r,--learningRate       (default 0.001)     learning rate
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
@@ -27,6 +28,7 @@ opt = lapp [[
   --epsiFreq              (default 1e5)       epsilon update
   --progFreq              (default 1e2)       frequency of progress output
   --saveFreq              (default 1e4)       the model is saved every save_freq steps
+  --useGPU                                    use GPU in training
 
   Model parameters:
   --lstmLayers            (default 1)     number of layers of RNN / LSTM
@@ -39,7 +41,7 @@ opt = lapp [[
   --savedir      (default './results')    subdirectory to save experiments in
 ]]
 
-
+torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
@@ -73,6 +75,14 @@ w, dE_dw = model:getParameters()
 print('Number of parameters ' .. w:nElement())
 print('Number of grads ' .. dE_dw:nElement())
 
+-- use GPU, if desired:
+if opt.useGPU then
+  require 'cunn'
+  require 'cutorch'
+  model:cuda()
+  criterion:cuda()
+  print('Using GPU')
+end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 print("Started training...")
@@ -86,7 +96,7 @@ while step < opt.steps do
       model:zeroGradParameters()
       f = f + criterion:forward(output, target)
       local dE_dy = criterion:backward(output, target)
-      model:backward(screen[1],dE_dy)
+      model:backward(screen_in,dE_dy)
       dE_dw:add(opt.weightDecay, w)
       return f, dE_dw -- return f and df/dX
     end
@@ -94,6 +104,7 @@ while step < opt.steps do
     -- We are in state S
     -- use model to get next action: Q function on S to get Q values for all possible actions
     screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+    if opt.useGPU then screen_in = screen_in:cuda() end
     output = model:forward(screen_in)
     local value, action_index = output:max(1) -- select max output
     -- print(action_index:size())
@@ -124,6 +135,7 @@ while step < opt.steps do
     -- observe Q(S',a)
     if not terminal then
       screen_in = image.scale(screen[1], 84, 84, 'bilinear') -- scale image to smaller size
+      if opt.useGPU then screen_in = screen_in:cuda() end
       output = model:forward(screen_in)
       value, action_index = output:max(1)
       update = reward + gamma*value
