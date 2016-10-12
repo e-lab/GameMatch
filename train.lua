@@ -16,6 +16,8 @@ opt = lapp [[
   --env_params          (default 'useRGB=true')     string of environment parameters
   --actrep              (default 1)                 how many times to repeat action
   --random_starts       (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
+  --gamma               (default 0.975)             discount factor in learning
+  --epsilon             (default 1)                 initial value of ϵ-greedy action selection
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
@@ -59,8 +61,8 @@ local game_env, game_actions, agent, opt = setup(opt)
 
 -- set parameters and vars:
 local step = 0
-local epsilon = 1 -- ϵ-greedy action selection
-local gamma = 0.9 -- discount factor
+local epsilon = opt.epsilon -- ϵ-greedy action selection
+local gamma = opt.gamma -- discount factor
 local err = 0 -- loss function error
 local w, dE_dw
 local optimState = {
