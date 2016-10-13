@@ -50,7 +50,6 @@ opt = lapp [[
 
 -- format options:
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
-opt.learnStart = opt.batchSize -- we shoudl not start training until we have enough to fill a batch
 
 if opt.verbose >= 1 then
     print('Using options:')
@@ -143,7 +142,6 @@ while step < opt.steps do
 
   -- make the move:
   if not terminal then
-      print(actionIdx)
       screen, reward, terminal = gameEnv:step(gameActions[actionIdx], true)
   else
       if opt.randomStarts > 0 then
@@ -165,7 +163,7 @@ while step < opt.steps do
   -- note: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
 
   -- Q-learning in batch mode every few steps:
-  if step % opt.QLearnFreq == 0 and step > opt.learnStart  then
+  if step % opt.QLearnFreq == 0 and step > opt.ERBufSize then -- we shoudl not start training until we have filled the buffer
     -- print('step', step)
     -- print('buffer size', #buffer)
     -- create next training batch:
