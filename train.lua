@@ -166,12 +166,12 @@ while step < opt.steps do
 
   -- Q-learning in batch mode every few steps:
   if step % opt.QLearnFreq == 0 and step > opt.learnStart  then
-    print('step', step)
-    print('buffer size', #buffer)
+    -- print('step', step)
+    -- print('buffer size', #buffer)
     -- create next training batch:
     local ri = torch.randperm(opt.ERBufSize)
     for i=1,opt.batchSize do
-      print('indices', i, ri[i])
+      -- print('indices', i, ri[i])
       input[i] = buffer[ri[i]].state
       newinput[i] = buffer[ri[i]].newState
     end
