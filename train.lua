@@ -65,7 +65,7 @@ torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
 --- General setup:
-local game_env, game_actions, agent, opt = setup(opt)
+local gameEnv, gameActions, agent, opt = setup(opt)
 
 -- set parameters and vars:
 local step = 0
@@ -76,17 +76,18 @@ local w, dE_dw
 local optimState = {
   learningRate = opt.learningRate,
   momentum = opt.momentum,
-  learningRateDecay = opt.learningRateDecay
+  learningRateDecay = opt.learningRateDecay,
+  weightDecay = opt.weightDecay
 }
 local total_reward = 0
 local nrewards = 0
 
 -- start a new game, here screen == state
-local screen, reward, terminal = game_env:getState()
+local screen, reward, terminal = gameEnv:getState()
 
 -- get model:
 local model, criterion
-model, criterion = createModel(#game_actions)
+model, criterion = createModel(#gameActions)
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
 print('Number of parameters ' .. w:nElement())
@@ -103,10 +104,14 @@ end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 local win = nil
-local input, output, target, value, action_index, state, action, new_state
+local input, newinput, output, target, value, actionIdx, state, action, newState
 local buffer = {} -- Experience Replay buffer
 input = torch.Tensor(opt.batchSize, 3, 84, 84)
 if opt.useGPU then input = input:cuda() end
+newinput = torch.Tensor(opt.batchSize, 3, 84, 84)
+if opt.useGPU then newinput = newinput:cuda() end
+target = torch.Tensor(opt.batchSize, #gameActions)
+if opt.useGPU then target = target:cuda() end
 
 print("Started training...")
 while step < opt.steps do
@@ -120,38 +125,64 @@ while step < opt.steps do
     f = f + criterion:forward(output, target)
     local dE_dy = criterion:backward(output, target)
     model:backward(input,dE_dy)
-    dE_dw:add(opt.weightDecay, w)
     return f, dE_dw -- return f and df/dX
   end
+      
+  -- We are in state S, now use model to get next action:
+  state = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
+  if opt.useGPU then state = state:cuda() end
+  local outNet = model:forward(state)
 
-  local function scaleOneIm(im) -- scale one image
-    return image.scale(im[1], 84, 84, 'bilinear')
+  -- at random chose random action or action from neural net: best action from Q(state,a)
+  if math.random() < epsilon then
+    actionIdx = math.random(#gameActions) -- random action
+  else
+    value, actionIdx = outNet:max(1) -- select max output
+    actionIdx = actionIdx[1] -- select action from neural net
   end
 
-  local function scaleBIm(im) -- scale batch of images
-    for i=1,im:size(1) do
-      input[i] = image.scale(im[i], 84, 84, 'bilinear') -- scale image to smaller size
-    end
-    return input
+  -- make the move:
+  if not terminal then
+      print(actionIdx)
+      screen, reward, terminal = gameEnv:step(gameActions[actionIdx], true)
+  else
+      if opt.randomStarts > 0 then
+          screen, reward, terminal = gameEnv:nextRandomGame()
+      else
+          screen, reward, terminal = gameEnv:newGame()
+      end
+  end
+  newState = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
+  if opt.useGPU then newState = newState:cuda() end
+  if reward ~= 0 then
+    nrewards = nrewards + 1
+    total_reward = total_reward + reward
   end
 
-  local function modelEval(im) -- forward model
-      local input = scaleBIm(im)
-      output = model:forward(input)
-      return output
-  end
+  -- Experience Replay: store episode in rolling buffer memory:
+  buffer[step%opt.ERBufSize+1] = {state=state:clone(), action=actionIdx, outState = outNet:clone(),
+            reward=reward, newState=newState:clone(), terminal=terminal}
+  -- note: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
 
-  local function getNextBatch()
+  -- Q-learning in batch mode every few steps:
+  if step % opt.QLearnFreq == 0 and step > opt.learnStart  then
+    print('step', step)
+    print('buffer size', #buffer)
+    -- create next training batch:
     local ri = torch.randperm(opt.ERBufSize)
     for i=1,opt.batchSize do
+      print('indices', i, ri[i])
       input[i] = buffer[ri[i]].state
+      newinput[i] = buffer[ri[i]].newState
     end
-    target = output:clone() -- copy previous output as 
-    output = model:forward(input) --modelEval(input)
+    -- get output at 'state'
+    output = model:forward(newinput)
+    -- here we modify the target vector with Q updates:
     for i=1,opt.batchSize do
-      -- observe Q(S',a)
+      target[i] = buffer[ri[i]].outState -- get target vector at 'state'
+      -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
-        value, action_index = output[i]:max(1)
+        value, actionIdx = output[i]:max(1) -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma*value
       else
         update = buffer[ri[i]].reward
@@ -159,46 +190,7 @@ while step < opt.steps do
       target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
     end
     if opt.useGPU then target = target:cuda() end
-    return target
-  end
-      
-  -- We are in state S, now use model to get next action:
-  state = screen:clone()
-  local outNet = modelEval(screen)
 
-  -- at random chose random action or action from neural net: best action from Q(S,a)
-  if math.random() < epsilon then
-    action_index = math.random(#game_actions) -- random action
-  else
-    value, action_index = outNet:max(1) -- select max output
-    action_index = action_index[1] -- select action from neural net
-  end
-
-  -- make the move:
-  if not terminal then
-      print(action_index)
-      screen, reward, terminal = game_env:step(game_actions[action_index], true)
-  else
-      if opt.randomStarts > 0 then
-          screen, reward, terminal = game_env:nextRandomGame()
-      else
-          screen, reward, terminal = game_env:newGame()
-      end
-  end
-  new_state = screen:clone()
-  if reward ~= 0 then
-    nrewards = nrewards + 1
-    total_reward = total_reward + reward
-  end
-
-  -- store episode in rolling buffer memory:
-  buffer[step%opt.ERBufSize+1] = {state=scaleOneIm(state), action=action_index, 
-            reward=reward, nstate=scaleOneIm(new_state), terminal=terminal}
-
-  -- Q-learning updates every few steps:
-  if step % opt.QLearnFreq == 0 and step > opt.learnStart  then
-    print('step', step)
-    target = getNextBatch()
     -- then train neural net:
     _,fs = optim.adam(eval_E, w, optimState)
     err = err + fs[1]
