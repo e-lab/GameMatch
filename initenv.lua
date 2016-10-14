@@ -13,6 +13,7 @@ require 'image'
 require 'model'
 require 'optim'
 
+
 function setup(_opt)
     assert(_opt)
 

@@ -65,6 +65,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
+
 --- General setup:
 local gameEnv, gameActions, agent, opt = setup(opt)
 
@@ -102,6 +103,27 @@ if opt.useGPU then
   print('Using GPU')
 end
 
+--- set up random number generators
+-- removing lua RNG; seeding torch RNG with opt.seed and setting cutorch
+-- RNG seed to the first uniform random int32 from the previous RNG;
+-- this is preferred because using the same seed for both generators
+-- may introduce correlations; we assume that both torch RNGs ensure
+-- adequate dispersion for different seeds.
+math.random = nil
+opt.seed = opt.seed or 1
+torch.manualSeed(opt.seed)
+if opt.verbose >= 1 then
+    print('Torch Seed:', torch.initialSeed())
+end
+local firstRandInt = torch.random()
+if opt.useGPU then
+    cutorch.manualSeed(firstRandInt)
+    if opt.verbose >= 1 then
+        print('CUTorch Seed:', cutorch.initialSeed())
+    end
+end
+
+
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 local win = nil
 local input, newinput, output, target, state, outNet, value, actionIdx
@@ -114,6 +136,7 @@ newinput = torch.Tensor(opt.batchSize, 3, 84, 84)
 if opt.useGPU then newinput = newinput:cuda() end
 target = torch.Tensor(opt.batchSize, #gameActions)
 if opt.useGPU then target = target:cuda() end
+local hist = torch.zeros(#gameActions)
 
 print("Started training...")
 while step < opt.steps do
@@ -141,8 +164,9 @@ while step < opt.steps do
     outNet = model:forward(state)
 
     -- at random chose random action or action from neural net: best action from Q(state,a)
-    if math.random() < epsilon then
-      actionIdx = math.random(#gameActions) -- random action
+    if torch.uniform() < epsilon then
+      actionIdx = torch.random(#gameActions) -- random action
+      -- hist[actionIdx] = hist[actionIdx] + 1
     else
       value, actionIdx = outNet:max(1) -- select max output
       actionIdx = actionIdx[1] -- select action from neural net
@@ -174,7 +198,8 @@ while step < opt.steps do
     -- Experience Replay: store episode in rolling buffer memory:
     buffer[bufStep%opt.ERBufSize+1] = {state=state:clone(), action=actionIdx, outState = outNet:clone(),
               reward=reward, newState=newState:clone(), terminal=terminal}
-    -- note: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
+    -- note 1: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
+    -- note 2: find a better way to store episode: store only important episode
     bufStep = bufStep + 1
   end
 
@@ -212,7 +237,7 @@ while step < opt.steps do
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
   if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
-
+-- print(hist)
   -- display screen and print results:
   if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
   if step % opt.progFreq == 0 then
@@ -220,7 +245,7 @@ while step < opt.steps do
       ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
       -- string.format(', average loss = %.2f', err) ..
       string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate ..
-      string.format(', step time %.2f [ms]', sys.toc()*1000) 
+      string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
   end
   err = 0 -- reset error
