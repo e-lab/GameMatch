@@ -133,7 +133,10 @@ while step < opt.steps do
   -- we make a new move only every few frames
   if step == 1 or step % opt.QLearnFreq == 0 then
     -- We are in state S, now use model to get next action:
-    state = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
+    -- game screen size = {1,3,210,160}
+    -- state = image.scale(screen[1], 84, 84) -- scale screen
+    state = image.scale(screen[1][{{},{100,210},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    -- win = image.display({image=state, win=win, zoom=opt.zoom}) -- debug line
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
 
@@ -157,8 +160,11 @@ while step < opt.steps do
       end
   end
 
+
   if step > 1 and step % opt.QLearnFreq == 0 then
-    local newState = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
+    -- game screen size = {1,3,210,160}
+    -- local newState = image.scale(screen[1], 84, 84) -- scale screen
+    newState = image.scale(screen[1][{{},{100,210},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nrewards = nrewards + 1
@@ -208,7 +214,7 @@ while step < opt.steps do
   if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
 
   -- display screen and print results:
-  if opt.display then win = image.display({image=pic, win=win, zoom=opt.zoom}) end
+  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
   if step % opt.progFreq == 0 then
     print('==> iteration = ' .. step ..
       ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
