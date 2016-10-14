@@ -17,7 +17,7 @@ opt = lapp [[
   --game_path           (default 'roms/')           path to environment file (ROM)
   --env_params          (default 'useRGB=true')     string of environment parameters
   --pool_frms_type      (default 'max')             pool inputs frames mode
-  --pool_frms_size      (default '2')               pool inputs frames size
+  --pool_frms_size      (default '4')               pool inputs frames size
   --actrep              (default 1)                 how many times to repeat action
   --randomStarts        (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
   --gamma               (default 0.975)             discount factor in learning
@@ -33,10 +33,8 @@ opt = lapp [[
   --batchSize             (default 128)       batch size for training
   --ERBufSize             (default 256)       Experience Replay buffer memory
   --QLearnFreq            (default 4)         learn every update_freq steps of game
-  --steps                 (default 1e5)       number of training steps to perform
-  --epsiFreq              (default 1e5)       epsilon update
-  --progFreq              (default 1e2)       frequency of progress output
-  --saveFreq              (default 1e4)       the model is saved every save_freq steps
+  --steps                 (default 1e6)       number of training steps to perform
+  --progFreq              (default 1e3)       frequency of progress output
   --useGPU                                    use GPU in training
 
   Model parameters:
@@ -52,6 +50,8 @@ opt = lapp [[
 
 -- format options:
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
+opt.epsiFreq = opt.steps -- update epsilon with steps
+opt.saveFreq = opt.steps / 10 -- save 10 times total
 
 if opt.verbose >= 1 then
     print('Using options:')
