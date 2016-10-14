@@ -25,7 +25,7 @@ opt = lapp [[
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
-  --seed                  (default 1250)      initial random seed
+  --seed                  (default 1)         initial random seed
   -r,--learningRate       (default 0.001)     learning rate
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
