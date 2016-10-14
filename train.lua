@@ -1,6 +1,8 @@
 -- Eugenio Culurciello
 -- October 2016
 -- Deep Q learning code
+-- an implementation of: http://www.nature.com/nature/journal/v518/n7540/full/nature14236.html
+-- inspired by: http://outlace.com/Reinforcement-Learning-Part-3/
 
 if not dqn then
     require "initenv"
@@ -15,7 +17,7 @@ opt = lapp [[
   --game_path           (default 'roms/')           path to environment file (ROM)
   --env_params          (default 'useRGB=true')     string of environment parameters
   --pool_frms_type      (default 'max')             pool inputs frames mode
-  --pool_frms_size      (default '2')                 pool inputs frames size
+  --pool_frms_size      (default '2')               pool inputs frames size
   --actrep              (default 1)                 how many times to repeat action
   --randomStarts        (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
   --gamma               (default 0.975)             discount factor in learning
@@ -67,7 +69,6 @@ os.execute('mkdir '..opt.savedir)
 local gameEnv, gameActions, agent, opt = setup(opt)
 
 -- set parameters and vars:
-local step = 0
 local epsilon = opt.epsilon -- ϵ-greedy action selection
 local gamma = opt.gamma -- discount factor
 local err = 0 -- loss function error
@@ -103,7 +104,9 @@ end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 local win = nil
-local input, newinput, output, target, value, actionIdx, state, action, newState
+local input, newinput, output, target, state, outNet
+local step = 0
+local bufStep = 1 -- easy way to keep buffer index
 local buffer = {} -- Experience Replay buffer
 input = torch.Tensor(opt.batchSize, 3, 84, 84)
 if opt.useGPU then input = input:cuda() end
@@ -126,18 +129,21 @@ while step < opt.steps do
     model:backward(input,dE_dy)
     return f, dE_dw -- return f and df/dX
   end
-      
-  -- We are in state S, now use model to get next action:
-  state = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
-  if opt.useGPU then state = state:cuda() end
-  local outNet = model:forward(state)
 
-  -- at random chose random action or action from neural net: best action from Q(state,a)
-  if math.random() < epsilon then
-    actionIdx = math.random(#gameActions) -- random action
-  else
-    value, actionIdx = outNet:max(1) -- select max output
-    actionIdx = actionIdx[1] -- select action from neural net
+  -- we make a new move only every few frames
+  if step == 1 or step % opt.QLearnFreq == 0 then
+    -- We are in state S, now use model to get next action:
+    state = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
+    if opt.useGPU then state = state:cuda() end
+    outNet = model:forward(state)
+
+    -- at random chose random action or action from neural net: best action from Q(state,a)
+    if math.random() < epsilon then
+      actionIdx = math.random(#gameActions) -- random action
+    else
+      local value, actionIdx = outNet:max(1) -- select max output
+      actionIdx = actionIdx[1] -- select action from neural net
+    end
   end
 
   -- make the move:
@@ -150,20 +156,24 @@ while step < opt.steps do
           screen, reward, terminal = gameEnv:newGame()
       end
   end
-  newState = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
-  if opt.useGPU then newState = newState:cuda() end
-  if reward ~= 0 then
-    nrewards = nrewards + 1
-    total_reward = total_reward + reward
+
+  if step > 1 and step % opt.QLearnFreq == 0 then
+    local newState = image.scale(screen[1], 84, 84, 'bilinear') -- scale screen
+    if opt.useGPU then newState = newState:cuda() end
+    if reward ~= 0 then
+      nrewards = nrewards + 1
+      total_reward = total_reward + reward
+    end
+
+    -- Experience Replay: store episode in rolling buffer memory:
+    buffer[bufStep%opt.ERBufSize+1] = {state=state:clone(), action=actionIdx, outState = outNet:clone(),
+              reward=reward, newState=newState:clone(), terminal=terminal}
+    -- note: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
+    bufStep = bufStep + 1
   end
 
-  -- Experience Replay: store episode in rolling buffer memory:
-  buffer[step%opt.ERBufSize+1] = {state=state:clone(), action=actionIdx, outState = outNet:clone(),
-            reward=reward, newState=newState:clone(), terminal=terminal}
-  -- note: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
-
   -- Q-learning in batch mode every few steps:
-  if step % opt.QLearnFreq == 0 and step > opt.ERBufSize then -- we shoudl not start training until we have filled the buffer
+  if step % opt.QLearnFreq == 0 and bufStep > opt.ERBufSize then -- we shoudl not start training until we have filled the buffer
     -- print('step', step)
     -- print('buffer size', #buffer)
     -- create next training batch:
@@ -180,7 +190,7 @@ while step < opt.steps do
       target[i] = buffer[ri[i]].outState -- get target vector at 'state'
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
-        value, actionIdx = output[i]:max(1) -- computed at 'newState'
+        local value, actionIdx = output[i]:max(1) -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma*value
       else
         update = buffer[ri[i]].reward
@@ -194,6 +204,11 @@ while step < opt.steps do
     err = err + fs[1]
   end
 
+  -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
+  if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
+
+  -- display screen and print results:
+  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
   if step % opt.progFreq == 0 then
     print('==> iteration = ' .. step ..
       ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
@@ -203,12 +218,6 @@ while step < opt.steps do
     )
   end
   err = 0 -- reset error
-
-  -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
-
-  -- display screen
-  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
 
   -- save results if needed:
   if step % opt.saveFreq == 0 then
