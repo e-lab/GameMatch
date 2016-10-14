@@ -19,7 +19,7 @@ opt = lapp [[
   --pool_frms_type      (default 'max')             pool inputs frames mode
   --pool_frms_size      (default '4')               pool inputs frames size
   --actrep              (default 1)                 how many times to repeat action
-  --randomStarts        (default 0)                 play action 0 between 1 and random_starts number of times at the start of each training episode
+  --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
   --gamma               (default 0.975)             discount factor in learning
   --epsilon             (default 1)                 initial value of ϵ-greedy action selection
   
@@ -186,7 +186,7 @@ while step < opt.steps do
   if step > 1 and step % opt.QLearnFreq == 0 then
     -- game screen size = {1,3,210,160}
     -- local newState = image.scale(screen[1], 84, 84) -- scale screen
-    state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    local newState = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nrewards = nrewards + 1
