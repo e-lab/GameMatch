@@ -104,7 +104,7 @@ end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 local win = nil
-local input, newinput, output, target, state, outNet
+local input, newinput, output, target, state, outNet, value, actionIdx
 local step = 0
 local bufStep = 1 -- easy way to keep buffer index
 local buffer = {} -- Experience Replay buffer
@@ -141,7 +141,7 @@ while step < opt.steps do
     if math.random() < epsilon then
       actionIdx = math.random(#gameActions) -- random action
     else
-      local value, actionIdx = outNet:max(1) -- select max output
+      value, actionIdx = outNet:max(1) -- select max output
       actionIdx = actionIdx[1] -- select action from neural net
     end
   end
@@ -183,15 +183,15 @@ while step < opt.steps do
       input[i] = buffer[ri[i]].state
       newinput[i] = buffer[ri[i]].newState
     end
-    -- get output at 'state'
+    -- get output at 'newState'
     output = model:forward(newinput)
     -- here we modify the target vector with Q updates:
     for i=1,opt.batchSize do
       target[i] = buffer[ri[i]].outState -- get target vector at 'state'
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
-        local value, actionIdx = output[i]:max(1) -- computed at 'newState'
-        update = buffer[ri[i]].reward + gamma*value
+        local val = output[i]:max() -- computed at 'newState'
+        update = buffer[ri[i]].reward + gamma * val
       else
         update = buffer[ri[i]].reward
       end
@@ -208,7 +208,7 @@ while step < opt.steps do
   if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
 
   -- display screen and print results:
-  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
+  if opt.display then win = image.display({image=pic, win=win, zoom=opt.zoom}) end
   if step % opt.progFreq == 0 then
     print('==> iteration = ' .. step ..
       ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
