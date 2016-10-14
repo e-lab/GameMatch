@@ -136,7 +136,6 @@ newinput = torch.Tensor(opt.batchSize, 3, 84, 84)
 if opt.useGPU then newinput = newinput:cuda() end
 target = torch.Tensor(opt.batchSize, #gameActions)
 if opt.useGPU then target = target:cuda() end
-local hist = torch.zeros(#gameActions)
 
 print("Started training...")
 while step < opt.steps do
@@ -166,7 +165,6 @@ while step < opt.steps do
     -- at random chose random action or action from neural net: best action from Q(state,a)
     if torch.uniform() < epsilon then
       actionIdx = torch.random(#gameActions) -- random action
-      -- hist[actionIdx] = hist[actionIdx] + 1
     else
       value, actionIdx = outNet:max(1) -- select max output
       actionIdx = actionIdx[1] -- select action from neural net
@@ -205,12 +203,9 @@ while step < opt.steps do
 
   -- Q-learning in batch mode every few steps:
   if step % opt.QLearnFreq == 0 and bufStep > opt.ERBufSize then -- we shoudl not start training until we have filled the buffer
-    -- print('step', step)
-    -- print('buffer size', #buffer)
     -- create next training batch:
     local ri = torch.randperm(opt.ERBufSize)
     for i=1,opt.batchSize do
-      -- print('indices', i, ri[i])
       input[i] = buffer[ri[i]].state
       newinput[i] = buffer[ri[i]].newState
     end
@@ -237,7 +232,7 @@ while step < opt.steps do
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
   if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
--- print(hist)
+
   -- display screen and print results:
   if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
   if step % opt.progFreq == 0 then
