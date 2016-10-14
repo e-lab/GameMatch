@@ -157,7 +157,7 @@ while step < opt.steps do
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
     -- state = image.scale(screen[1], 84, 84) -- scale screen
-    state = image.scale(screen[1][{{},{100,210},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     -- win = image.display({image=state, win=win, zoom=opt.zoom}) -- debug line
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
@@ -186,7 +186,7 @@ while step < opt.steps do
   if step > 1 and step % opt.QLearnFreq == 0 then
     -- game screen size = {1,3,210,160}
     -- local newState = image.scale(screen[1], 84, 84) -- scale screen
-    newState = image.scale(screen[1][{{},{100,210},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nrewards = nrewards + 1
