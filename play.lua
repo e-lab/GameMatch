@@ -5,7 +5,7 @@
 require 'qtwidget' -- for keyboard interaction
 
 if not dqn then
-    require "initenv"
+    require "initenvPlay"
 end
 
 
@@ -33,18 +33,18 @@ cmd:option('-seed', 1, 'fixed input seed for repeatable experiments')
 cmd:option('-verbose', 2,
            'the higher the level, the more information is printed to screen')
 cmd:option('-threads', 8, 'number of BLAS threads')
-cmd:option('-gpu', 1, 'gpu flag')
+cmd:option('-gpu', -1, 'gpu flag')
 cmd:option('-gif_file', '', 'GIF path to write session screens')
 cmd:option('-csv_file', '', 'CSV path to write session data')
 --Frame option for size default is match with DeepMind Q learning
 --Default img size is 3 x 210 x 160
-cmd:option('-zoom', '1', 'zoom window')
+cmd:option('-zoom', '3', 'zoom window')
 cmd:option('-pool_frms_size',2,'frms_size')
 cmd:option('-poolfrms_type','\"max\"','frame option')
 --Save frame info
 cmd:option('-saveImg',true,'Save image under frames')
 cmd:option('-filePath', 'save', 'filePath')
-cmd:option('-size',50,'iteration size')
+cmd:option('-size',500,'iteration size')
 cmd:option('-seq',20,'seqence size')
 cmd:option('-freq',4,'Sample frequency size')
 --Option for save
@@ -107,8 +107,10 @@ size = opt.size
 seq     = opt.seq
 freq    = opt.freq
 maxFram = size*seq*freq
-container = torch.ByteTensor(size,seq,3,210,160):fill(0)
+container = torch.FloatTensor(size,seq,3,84,84):fill(0)
+collectgarbage()
 function main()
+    collectgarbage()
 -- while not terminal do
     -- if action was chosen randomly, Q-value is 0
     -- agent.bestq = 0
@@ -119,26 +121,31 @@ function main()
 
     -- play game in test mode (episodes don't end when losing a life)
     -- reward = score added, terminal = end of game (all lives gone)
+    collectgarbage()
     if action_index == 1 or idx == size then save = false print('Stop sampling') end
     if save then
        screen, reward, terminal = game_env:step(game_actions[action_index], false)
+       -- display screen
+       image.display({image=screen, win=win, zoom=opt.zoom})
        --Count frame number
        frame = frame+1
        print(frame)
        --Save frame based on freq and seq and maxFrm
        if frame ~= maxFram then
+       collectgarbage()
           if frame % freq == 0 then
              sampleFrame = math.floor(frame/freq)
              idx    = math.floor(sampleFrame / seq) + 1
              seqIdx = math.floor(sampleFrame % seq) + 1
              print('idx: ' , idx)
              print('seqIdx : ',seqIdx)
-             screen = screen:squeeze():byte()
+             tmp = image.scale(screen[1], 84, 84, 'bilinear')
              if opt.saveImg then
                 imgName = './save/frames/'..tostring(idx)..'_'..tostring(seqIdx)..'.png'
-                image.save(imgName,screen)
+                image.save(imgName,screen[1]:float())
              end
-             container[idx][seqIdx] = screen
+             container[idx][seqIdx] = tmp:float()
+             print('container sum : ',container[idx][seqIdx]:sum())
              --Save reward and terminal along with screen
              frames[seqIdx] = {action_index, reward, terminal}
              --Save to table with seq
@@ -172,8 +179,6 @@ function main()
     end
     -- print(reward, terminal)
 
-    -- display screen
-    image.display({image=screen, win=win, zoom=opt.zoom})
     if not save then
        print ('save frames')
        torch.save(filePath..'/actionTable.t7',file)
@@ -202,7 +207,7 @@ end
 
 -- game controls
 print('Game controls: left / right')
-qtimer.interval = 10
+qtimer.interval = 30
 qtimer.singleShot = false
 qt.connect(qtimer,'timeout()', main)
 
