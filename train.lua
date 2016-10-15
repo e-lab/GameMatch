@@ -30,16 +30,12 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --batchSize             (default 128)       batch size for training
-  --ERBufSize             (default 256)       Experience Replay buffer memory
+  --batchSize             (default 1024)      batch size for training
+  --ERBufSize             (default 1e6)       Experience Replay buffer memory
   --QLearnFreq            (default 4)         learn every update_freq steps of game
-  --steps                 (default 1e6)       number of training steps to perform
+  --steps                 (default 10e6)      number of training steps to perform
   --progFreq              (default 1e3)       frequency of progress output
   --useGPU                                    use GPU in training
-
-  Model parameters:
-  --lstmLayers            (default 1)     number of layers of RNN / LSTM
-  --nSeq                  (default 19)    input video sequence lenght
 
   Display and save parameters:
   --zoom                  (default 4)     zoom window
@@ -156,8 +152,8 @@ while step < opt.steps do
   if step == 1 or step % opt.QLearnFreq == 0 then
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
-    -- state = image.scale(screen[1], 84, 84) -- scale screen
-    state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    state = image.scale(screen[1], 84, 84) -- scale screen
+    -- state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     -- win = image.display({image=state, win=win, zoom=opt.zoom}) -- debug line
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
@@ -185,8 +181,8 @@ while step < opt.steps do
 
   if step > 1 and step % opt.QLearnFreq == 0 then
     -- game screen size = {1,3,210,160}
-    -- local newState = image.scale(screen[1], 84, 84) -- scale screen
-    local newState = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    local newState = image.scale(screen[1], 84, 84) -- scale screen
+    -- local newState = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nrewards = nrewards + 1
@@ -202,9 +198,9 @@ while step < opt.steps do
   end
 
   -- Q-learning in batch mode every few steps:
-  if step % opt.QLearnFreq == 0 and bufStep > opt.ERBufSize then -- we shoudl not start training until we have filled the buffer
+  if step % opt.QLearnFreq == 0 and bufStep > #buffer then -- we shoudl not start training until we have filled the buffer
     -- create next training batch:
-    local ri = torch.randperm(opt.ERBufSize)
+    local ri = torch.randperm(#buffer)
     for i=1,opt.batchSize do
       input[i] = buffer[ri[i]].state
       newinput[i] = buffer[ri[i]].newState
