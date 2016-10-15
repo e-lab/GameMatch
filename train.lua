@@ -30,10 +30,10 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --batchSize             (default 1024)      batch size for training
-  --ERBufSize             (default 1e6)       Experience Replay buffer memory
+  --batchSize             (default 256)      batch size for training
+  --ERBufSize             (default 1e5)       Experience Replay buffer memory
   --QLearnFreq            (default 4)         learn every update_freq steps of game
-  --steps                 (default 10e6)      number of training steps to perform
+  --steps                 (default 1e6)      number of training steps to perform
   --progFreq              (default 1e3)       frequency of progress output
   --useGPU                                    use GPU in training
 
@@ -189,21 +189,23 @@ while step < opt.steps do
       total_reward = total_reward + reward
     end
 
-    -- Experience Replay: store episode in rolling buffer memory:
-    buffer[bufStep%opt.ERBufSize+1] = {state=state:clone(), action=actionIdx, outState = outNet:clone(),
-              reward=reward, newState=newState:clone(), terminal=terminal}
+    -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
+    buffer[bufStep%opt.ERBufSize] = {state=state:clone():float(), action=actionIdx, outState = outNet:clone():float(),
+              reward=reward, newState=newState:clone():float(), terminal=terminal}
     -- note 1: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
     -- note 2: find a better way to store episode: store only important episode
     bufStep = bufStep + 1
   end
 
   -- Q-learning in batch mode every few steps:
-  if step % opt.QLearnFreq == 0 and bufStep > #buffer then -- we shoudl not start training until we have filled the buffer
+  if step % opt.QLearnFreq == 0 and bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
     -- create next training batch:
+    -- print(#buffer)
     local ri = torch.randperm(#buffer)
     for i=1,opt.batchSize do
-      input[i] = buffer[ri[i]].state
-      newinput[i] = buffer[ri[i]].newState
+      -- print('indices:', i, ri[i])
+      input[i] = buffer[ri[i]].state:cuda()
+      newinput[i] = buffer[ri[i]].newState:cuda()
     end
     -- get output at 'newState'
     output = model:forward(newinput)
