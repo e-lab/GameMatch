@@ -30,11 +30,12 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --batchSize             (default 256)      batch size for training
+  --batchSize             (default 256)       batch size for training
   --ERBufSize             (default 1e5)       Experience Replay buffer memory
   --QLearnFreq            (default 4)         learn every update_freq steps of game
-  --steps                 (default 1e6)      number of training steps to perform
+  --steps                 (default 1e6)       number of training steps to perform
   --progFreq              (default 1e3)       frequency of progress output
+  --evalSteps             (default 1e4)       number of test games to play to test results
   --useGPU                                    use GPU in training
 
   Display and save parameters:
@@ -47,7 +48,8 @@ opt = lapp [[
 -- format options:
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
 opt.epsiFreq = opt.steps -- update epsilon with steps
-opt.saveFreq = opt.steps / 10 -- save 10 times total
+opt.saveFreq = opt.steps / 10 -- save 10 times in total
+opt.testFreq = opt.steps / 100 -- test 100 times in total 
 
 if opt.verbose >= 1 then
     print('Using options:')
@@ -76,8 +78,8 @@ local optimState = {
   learningRateDecay = opt.learningRateDecay,
   weightDecay = opt.weightDecay
 }
-local total_reward = 0
-local nrewards = 0
+local totalReward = 0
+local nRewards = 0
 
 -- start a new game, here screen == state
 local screen, reward, terminal = gameEnv:getState()
@@ -185,8 +187,8 @@ while step < opt.steps do
     -- local newState = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
-      nrewards = nrewards + 1
-      total_reward = total_reward + reward
+      nRewards = nRewards + 1
+      totalReward = totalReward + reward
     end
 
     -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
@@ -232,10 +234,10 @@ while step < opt.steps do
   if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
 
   -- display screen and print results:
-  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom}) end
+  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom, title='Train'}) end
   if step % opt.progFreq == 0 then
     print('==> iteration = ' .. step ..
-      ', number rewards ' .. nrewards .. ', total reward ' .. total_reward ..
+      ', number rewards ' .. nRewards .. ', total reward ' .. totalReward ..
       -- string.format(', average loss = %.2f', err) ..
       string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate ..
       string.format(', step time %.2f [ms]', sys.toc()*1000)
@@ -246,8 +248,54 @@ while step < opt.steps do
   -- save results if needed:
   if step % opt.saveFreq == 0 then
     torch.save(opt.savedir .. '/DQN_' .. step .. ".t7", 
-      {model = model, total_reward = total_reward, nrewards = nrewards})
+      {model = model, totalReward = totalReward, nRewards = nRewards})
   end
+
+
+    -- test phase:
+  if step % opt.testFreq == 0 and step > 1 then
+    local screen, reward, terminal = gameEnv:newGame()
+
+    local testReward = 0
+    local nTestRewards = 0
+    local nEpisodes = 0
+
+    local testTime = sys.clock()
+    for estep = 1, opt.evalSteps do
+
+      local state = image.scale(screen[1], 84, 84) -- scale screen
+      -- state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+      if opt.useGPU then state = state:cuda() end
+      local outTest = model:forward(state)
+
+      -- at random chose random action or action from neural net: best action from Q(state,a)
+      local v, testIdx = outTest:max(1) -- select max output
+      testIdx = testIdx[1] -- select action from neural net
+      
+      -- Play game in test mode (episodes don't end when losing a life)
+      screen, reward, terminal = gameEnv:step(gameActions[4])--testIdx])
+
+      -- display screen
+      win2 = image.display({image=screen, win=win2, title='Test'})
+
+      -- record every reward
+      testReward = testReward + reward
+      if reward ~= 0 then
+         nTestRewards = nTestRewards + 1
+      end
+
+      if terminal then
+          nEpisodes = nEpisodes + 1
+          screen, reward, terminal = gameEnv:nextRandomGame()
+      end
+    end
+    testTime = sys.clock() - testTime
+    print('Testing iterations = ' .. opt.evalSteps ..
+      ', number rewards ' .. testReward .. ', total reward ' .. nTestRewards ..
+      string.format(', Testing time %.2f [ms]', testTime*1000)
+    )
+  end  
+
 
   if step%1000 == 0 then collectgarbage() end
 end
