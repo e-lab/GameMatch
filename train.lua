@@ -192,8 +192,8 @@ while step < opt.steps do
     end
 
     -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
-    buffer[bufStep%opt.ERBufSize] = {state=state:clone():float(), action=actionIdx:clone(), outState = outNet:clone():float(),
-              reward=reward:clone(), newState=newState:clone():float(), terminal=terminal:clone()}
+    buffer[bufStep%opt.ERBufSize] = { state=state:clone():float(), action=actionIdx, outState = outNet:clone():float(),
+              reward=reward, newState=newState:clone():float(), terminal=terminal }
     -- note 1: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
     -- note 2: find a better way to store episode: store only important episode
     bufStep = bufStep + 1
