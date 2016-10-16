@@ -192,8 +192,8 @@ while step < opt.steps do
     end
 
     -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
-    buffer[bufStep%opt.ERBufSize] = {state=state:clone():float(), action=actionIdx, outState = outNet:clone():float(),
-              reward=reward, newState=newState:clone():float(), terminal=terminal}
+    buffer[bufStep%opt.ERBufSize] = {state=state:clone():float(), action=actionIdx:clone(), outState = outNet:clone():float(),
+              reward=reward:clone(), newState=newState:clone():float(), terminal=terminal:clone()}
     -- note 1: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
     -- note 2: find a better way to store episode: store only important episode
     bufStep = bufStep + 1
@@ -217,11 +217,11 @@ while step < opt.steps do
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
         local val = output[i]:max() -- computed at 'newState'
-        update = buffer[ri[i]].reward + gamma * val
+        local update = buffer[ri[i]].reward + (1-buffer[ri[i]].terminal) * gamma * val
       else
         update = buffer[ri[i]].reward
       end
-      target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
+      target[i][buffer[ri[i]].action] = update:clone() -- target is previous output updated with reward
     end
     if opt.useGPU then target = target:cuda() end
 
@@ -239,7 +239,8 @@ while step < opt.steps do
     print('==> iteration = ' .. step ..
       ', number rewards ' .. nRewards .. ', total reward ' .. totalReward ..
       -- string.format(', average loss = %.2f', err) ..
-      string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate ..
+      string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate .. 
+      string.format(', error %.4f', err) ..
       string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
   end
