@@ -49,7 +49,6 @@ opt = lapp [[
 
 -- format options:
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
-opt.epsiFreq = opt.steps -- update epsilon with steps
 opt.saveFreq = opt.steps / 10 -- save 10 times in total
 
 if opt.verbose >= 1 then
@@ -232,7 +231,7 @@ while step < opt.steps do
   end
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.1 then epsilon = epsilon - (1/opt.epsiFreq) end
+  if epsilon > 0.1 then epsilon = epsilon - (1/opt.steps) end
 
   -- display screen and print results:
   if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom, title='Train'}) end
