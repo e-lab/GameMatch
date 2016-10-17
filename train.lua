@@ -275,7 +275,7 @@ while step < opt.steps do
       testIdx = testIdx[1] -- select action from neural net
       
       -- Play game in test mode (episodes don't end when losing a life)
-      screen, reward, terminal = gameEnv:step(gameActions[4])--testIdx])
+      screen, reward, terminal = gameEnv:step(gameActions[testIdx])
 
       -- display screen
       win2 = image.display({image=screen, win=win2, title='Test'})
