@@ -19,6 +19,7 @@ opt = lapp [[
   --env_params          (default 'useRGB=true')     string of environment parameters
 
   Net options:
+  --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
   --loadNet             (default '')                trained neural network to load
   --imSize                (default 84)        state is screen resized to this size 
   --sFrames             (default 4)         input frames to stack as input 
@@ -75,7 +76,9 @@ while true do
     outNet = model:forward(state)
     value, actionIdx = outNet:max(1) -- select max output
     actionIdx = actionIdx[1] -- select action from neural net
+    -- print(value, actionIdx)
   end
+  -- actionIdx= torch.random(#gameActions)
 
   win = image.display({image=screen, win=win, zoom=opt.zoom, title='Test net'})
 
