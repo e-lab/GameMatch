@@ -214,7 +214,7 @@ while step < opt.steps do
     -- here we modify the target vector with Q updates:
     local val, update
     for i=1,opt.batchSize do
-      target[i] = newOutput[i] -- get target vector at 'state'
+      target[i] = output[i] -- get target vector at 'state'
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
         val = newOutput[i]:max() -- computed at 'newState'
