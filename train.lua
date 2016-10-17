@@ -140,7 +140,7 @@ while step < opt.steps do
   step = step + 1
   sys.tic()
 
-  -- learning function for neural net:
+  -- learning function for training our neural net:
   local eval_E = function(w)
     local f = 0
     model:zeroGradParameters()
@@ -150,7 +150,7 @@ while step < opt.steps do
     return f, dE_dw -- return f and df/dX
   end
 
-  -- we make a new move only every few frames
+  -- we compute new actions only every few frames
   if step == 1 or step % opt.QLearnFreq == 0 then
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
@@ -169,7 +169,7 @@ while step < opt.steps do
     end
   end
 
-  -- make the move:
+  -- repeat the move >>> every step <<< (while learning happens only every opt.QLearnFreq)
   if not terminal then
       screen, reward, terminal = gameEnv:step(gameActions[actionIdx], true)
   else
@@ -180,7 +180,7 @@ while step < opt.steps do
       end
   end
 
-
+  -- compute action in newState and save to Experience Replay memory:
   if step > 1 and step % opt.QLearnFreq == 0 then
     -- game screen size = {1,3,210,160}
     local newState = image.scale(screen[1], 84, 84) -- scale screen
