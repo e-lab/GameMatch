@@ -30,9 +30,10 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
+  --imSize                (default 84)        state is screen resized to this size 
   --batchSize             (default 256)       batch size for training
   --ERBufSize             (default 1e5)       Experience Replay buffer memory
-  --QLearnFreq            (default 4)         learn every update_freq steps of game
+  --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
   --steps                 (default 1e6)       number of training steps to perform
   --progFreq              (default 1e3)       frequency of progress output
   --testFreq              (default 1e3)       frequency of testing
@@ -86,7 +87,7 @@ local screen, reward, terminal = gameEnv:getState()
 
 -- get model:
 local model, criterion
-model, criterion = createModel(#gameActions)
+model, criterion = createModel(#gameActions, opt.sFrames)
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
 print('Number of parameters ' .. w:nElement())
@@ -124,15 +125,17 @@ end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 local win = nil
-local input, newinput, output, target, state, outNet, value, actionIdx
+local input, newinput, output, target, state, newState, outNet, value, actionIdx
 local step = 0
 local bufStep = 1 -- easy way to keep buffer index
 local buffer = {} -- Experience Replay buffer
-input = torch.Tensor(opt.batchSize, 3, 84, 84)
+state = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
+newState = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
+input = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
 if opt.useGPU then input = input:cuda() end
-newinput = torch.Tensor(opt.batchSize, 3, 84, 84)
+newinput = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
 if opt.useGPU then newinput = newinput:cuda() end
-target = torch.Tensor(opt.batchSize, #gameActions)
+target = torch.zeros(opt.batchSize, #gameActions)
 if opt.useGPU then target = target:cuda() end
 
 print("Started training...")
@@ -151,12 +154,10 @@ while step < opt.steps do
   end
 
   -- we compute new actions only every few frames
-  if step == 1 or step % opt.QLearnFreq == 0 then
+  if step == 1 or step % opt.sFrames == 0 then
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
-    state = image.scale(screen[1], 84, 84) -- scale screen
-    -- state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
-    -- win = image.display({image=state, win=win, zoom=opt.zoom}) -- debug line
+    state[step%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
 
@@ -181,10 +182,9 @@ while step < opt.steps do
   end
 
   -- compute action in newState and save to Experience Replay memory:
-  if step > 1 and step % opt.QLearnFreq == 0 then
+  if step > 1 and step % opt.sFrames == 0 then
     -- game screen size = {1,3,210,160}
-    local newState = image.scale(screen[1], 84, 84) -- scale screen
-    -- local newState = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+    newState[step%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nRewards = nRewards + 1
@@ -200,7 +200,7 @@ while step < opt.steps do
   end
 
   -- Q-learning in batch mode every few steps:
-  if step % opt.QLearnFreq == 0 and bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
+  if step % opt.sFrames == 0 and bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
     -- create next training batch:
     -- print(#buffer)
     local ri = torch.randperm(#buffer)
@@ -266,8 +266,8 @@ while step < opt.steps do
     local testTime = sys.clock()
     for estep = 1, opt.evalSteps do
 
-      local state = image.scale(screen[1], 84, 84) -- scale screen
-      -- state = image.scale(screen[1][{{},{94,194},{9,152}}], 84, 84) -- scale screen -- resize to smaller portion
+      local state = image.scale(screen[1], opt.imSize, opt.imSize) -- scale screen
+      -- state = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize) -- scale screen -- resize to smaller portion
       if opt.useGPU then state = state:cuda() end
       local outTest = model:forward(state)
 
