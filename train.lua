@@ -192,8 +192,8 @@ while step < opt.steps do
     end
 
     -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
-    buffer[bufStep%opt.ERBufSize] = { state=state:clone():float(), action=actionIdx, outState = outNet:clone():float(),
-              reward=reward, newState=newState:clone():float(), terminal=terminal }
+    buffer[bufStep%opt.ERBufSize] = { state=state:clone():float(), action=actionIdx, reward=reward, 
+                                      newState=newState:clone():float(), terminal=terminal }
     -- note 1: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
     -- note 2: find a better way to store episode: store only important episode
     bufStep = bufStep + 1
@@ -209,15 +209,15 @@ while step < opt.steps do
       input[i] = buffer[ri[i]].state:cuda()
       newinput[i] = buffer[ri[i]].newState:cuda()
     end
-    -- get output at 'newState'
-    output = model:forward(newinput)
+    newOutput = model:forward(newinput):clone() -- get output at 'newState' (clone to avoid losing it next model forward!)
+    output = model:forward(input) -- get output at state for backprop
     -- here we modify the target vector with Q updates:
     local val, update
     for i=1,opt.batchSize do
-      target[i] = buffer[ri[i]].outState -- get target vector at 'state'
+      target[i] = newOutput[i] -- get target vector at 'state'
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
-        val = output[i]:max() -- computed at 'newState'
+        val = newOutput[i]:max() -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma * val
       else
         update = buffer[ri[i]].reward
