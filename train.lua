@@ -70,7 +70,7 @@ local gameEnv, gameActions, agent, opt = setup(opt)
 -- set parameters and vars:
 local epsilon = opt.epsilon -- ϵ-greedy action selection
 local gamma = opt.gamma -- discount factor
-local err = 0 -- loss function error
+local err = 0 -- loss function error (average over opt.progFreq steps)
 local w, dE_dw
 local optimState = {
   learningRate = opt.learningRate,
@@ -244,8 +244,9 @@ while step < opt.steps do
       string.format(', error %f', err) ..
       string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
+    err = 0 -- reset after reporting period
   end
-  err = 0 -- reset error
+  
 
   -- save results if needed:
   if step % opt.saveFreq == 0 then
