@@ -35,6 +35,7 @@ opt = lapp [[
   --QLearnFreq            (default 4)         learn every update_freq steps of game
   --steps                 (default 1e6)       number of training steps to perform
   --progFreq              (default 1e3)       frequency of progress output
+  --testFreq              (default 1e3)       frequency of testing
   --evalSteps             (default 1e4)       number of test games to play to test results
   --useGPU                                    use GPU in training
 
@@ -49,7 +50,6 @@ opt = lapp [[
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
 opt.epsiFreq = opt.steps -- update epsilon with steps
 opt.saveFreq = opt.steps / 10 -- save 10 times in total
-opt.testFreq = opt.steps / 100 -- test 100 times in total 
 
 if opt.verbose >= 1 then
     print('Using options:')
@@ -212,16 +212,17 @@ while step < opt.steps do
     -- get output at 'newState'
     output = model:forward(newinput)
     -- here we modify the target vector with Q updates:
+    local val, update
     for i=1,opt.batchSize do
       target[i] = buffer[ri[i]].outState -- get target vector at 'state'
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
-        local val = output[i]:max() -- computed at 'newState'
-        local update = buffer[ri[i]].reward + gamma * val
+        val = output[i]:max() -- computed at 'newState'
+        update = buffer[ri[i]].reward + gamma * val
       else
         update = buffer[ri[i]].reward
       end
-      target[i][buffer[ri[i]].action] = update:clone() -- target is previous output updated with reward
+      target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
     end
     if opt.useGPU then target = target:cuda() end
 
@@ -240,7 +241,7 @@ while step < opt.steps do
       ', number rewards ' .. nRewards .. ', total reward ' .. totalReward ..
       -- string.format(', average loss = %.2f', err) ..
       string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate .. 
-      string.format(', error %.4f', err) ..
+      string.format(', error %f', err) ..
       string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
   end
