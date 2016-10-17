@@ -217,7 +217,7 @@ while step < opt.steps do
       -- observe Q(newState,a)
       if not buffer[ri[i]].terminal then
         local val = output[i]:max() -- computed at 'newState'
-        local update = buffer[ri[i]].reward + (1-buffer[ri[i]].terminal) * gamma * val
+        local update = buffer[ri[i]].reward + gamma * val
       else
         update = buffer[ri[i]].reward
       end
