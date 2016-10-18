@@ -25,7 +25,7 @@ opt = lapp [[
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
-  --seed                  (default 9999910101)         initial random seed
+  --seed                  (default 1)         initial random seed
   -r,--learningRate       (default 0.001)     learning rate
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
@@ -165,8 +165,8 @@ while step < opt.steps do
   if step == 1 or step % opt.sFrames == 0 then
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
-    state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
-    -- state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
+    -- state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
+    state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
 
@@ -194,8 +194,8 @@ while step < opt.steps do
   -- compute action in newState and save to Experience Replay memory:
   if step > 1 and step % opt.sFrames == 0 then
     -- game screen size = {1,3,210,160}
-    newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
-    -- newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
+    -- newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
+    newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
     if opt.useGPU then state = state:cuda() end
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
@@ -212,7 +212,7 @@ while step < opt.steps do
   end
 
   -- Q-learning in batch mode every few steps:
-  if step % opt.sFrames == 0 and bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
+  if bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
     -- create next training batch:
     local ri = torch.randperm(#buffer)
     for i=1,opt.batchSize do
@@ -222,6 +222,7 @@ while step < opt.steps do
     end
     newOutput = model:forward(newinput):clone() -- get output at 'newState' (clone to avoid losing it next model forward!)
     output = model:forward(input) -- get output at state for backprop
+    -- print(output)
     -- here we modify the target vector with Q updates:
     local val, update
     for i=1,opt.batchSize do
