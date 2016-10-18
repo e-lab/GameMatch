@@ -139,9 +139,9 @@ target = torch.zeros(opt.batchSize, #gameActions)
 if opt.useGPU then target = target:cuda() end
 
 
-local logger = optim.Logger('gradient.log')
-logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
-logger:style{'-', '-', '-', '-'}
+-- local logger = optim.Logger('gradient.log')
+-- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
+-- logger:style{'-', '-', '-', '-'}
 
 
 print("Started training...")
@@ -151,12 +151,12 @@ while step < opt.steps do
 
   -- learning function for training our neural net:
   local eval_E = function(w)
-    model:zeroGradParameters()
+    dE_dw:zero()
     local f = criterion:forward(output, target)
     local dE_dy = criterion:backward(output, target)
-    logger:add(torch.totable(dE_dy)[1])
-    logger:add(torch.totable(dE_dy)[2])
-    logger:plot()
+    -- print(dE_dy[1]:view(1,-1))
+    -- logger:add(torch.totable(dE_dy)[1])
+    -- logger:plot()
     model:backward(input, dE_dy)
     return f, dE_dw -- return f and df/dX
   end
@@ -253,7 +253,7 @@ while step < opt.steps do
   if step % opt.progFreq == 0 then
     print('==> iteration = ' .. step ..
       ', number rewards ' .. nRewards .. ', total reward ' .. totalReward ..
-      string.format(', average loss = %.f', err) ..
+      string.format(', average loss = %f', err) ..
       string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate .. 
       string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
