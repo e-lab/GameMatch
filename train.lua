@@ -138,6 +138,12 @@ if opt.useGPU then newinput = newinput:cuda() end
 target = torch.zeros(opt.batchSize, #gameActions)
 if opt.useGPU then target = target:cuda() end
 
+-- logger = optim.Logger('gradient.log')
+  -- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
+  -- logger:style{'-', '-', '-', '-'}
+
+
+
 print("Started training...")
 while step < opt.steps do
   step = step + 1
@@ -148,6 +154,9 @@ while step < opt.steps do
     model:zeroGradParameters()
     local f = criterion:forward(output, target)
     local dE_dy = criterion:backward(output, target)
+    -- logger:add(torch.totable(dE_dy)[1])
+    -- logger:add(torch.totable(dE_dy)[2])
+    -- logger:plot()
     model:backward(input, dE_dy)
     return f, dE_dw -- return f and df/dX
   end
@@ -202,7 +211,6 @@ while step < opt.steps do
   -- Q-learning in batch mode every few steps:
   if step % opt.sFrames == 0 and bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
     -- create next training batch:
-    -- print(#buffer)
     local ri = torch.randperm(#buffer)
     for i=1,opt.batchSize do
       -- print('indices:', i, ri[i])
@@ -215,14 +223,16 @@ while step < opt.steps do
     local val, update
     for i=1,opt.batchSize do
       target[i] = output[i] -- get target vector at 'state'
-      -- observe Q(newState,a)
-      if not buffer[ri[i]].terminal then
+      -- print('\n\n\ntarget:', target[i]:view(1,-1))
+      -- update from newState:
+      if buffer[ri[i]].terminal then
+        update = buffer[ri[i]].reward
+      else
         val = newOutput[i]:max() -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma * val
-      else
-        update = buffer[ri[i]].reward
       end
       target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
+      -- print('new target:', target[i]:view(1,-1), 'action', buffer[ri[i]].action)
     end
     if opt.useGPU then target = target:cuda() end
 
