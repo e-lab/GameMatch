@@ -250,7 +250,7 @@ while step < opt.steps do
 
   -- save results if needed:
   if step % opt.saveFreq == 0 then
-    torch.save( opt.savedir .. '/DQN_model' .. step .. ".net", model:clone():float() )
+    torch.save( opt.savedir .. '/DQN_model' .. step .. ".net", model:clone():clearState():float() )
   end
 
 
