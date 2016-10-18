@@ -138,10 +138,10 @@ if opt.useGPU then newinput = newinput:cuda() end
 target = torch.zeros(opt.batchSize, #gameActions)
 if opt.useGPU then target = target:cuda() end
 
--- logger = optim.Logger('gradient.log')
-  -- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
-  -- logger:style{'-', '-', '-', '-'}
 
+local logger = optim.Logger('gradient.log')
+logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
+logger:style{'-', '-', '-', '-'}
 
 
 print("Started training...")
@@ -154,9 +154,9 @@ while step < opt.steps do
     model:zeroGradParameters()
     local f = criterion:forward(output, target)
     local dE_dy = criterion:backward(output, target)
-    -- logger:add(torch.totable(dE_dy)[1])
-    -- logger:add(torch.totable(dE_dy)[2])
-    -- logger:plot()
+    logger:add(torch.totable(dE_dy)[1])
+    logger:add(torch.totable(dE_dy)[2])
+    logger:plot()
     model:backward(input, dE_dy)
     return f, dE_dw -- return f and df/dX
   end
