@@ -166,6 +166,7 @@ while step < opt.steps do
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
     state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
+    -- state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
 
@@ -194,6 +195,8 @@ while step < opt.steps do
   if step > 1 and step % opt.sFrames == 0 then
     -- game screen size = {1,3,210,160}
     newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
+    -- newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
+    if opt.useGPU then state = state:cuda() end
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nRewards = nRewards + 1
