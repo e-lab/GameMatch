@@ -156,7 +156,7 @@ while step < opt.steps do
   if step == 1 or step % opt.sFrames == 0 then
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,3,210,160}
-    state[step%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
+    state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
 
@@ -166,6 +166,7 @@ while step < opt.steps do
     else
       value, actionIdx = outNet:max(1) -- select max output
       actionIdx = actionIdx[1] -- select action from neural net
+      -- print('action', actionIdx)
     end
   end
 
@@ -183,7 +184,7 @@ while step < opt.steps do
   -- compute action in newState and save to Experience Replay memory:
   if step > 1 and step % opt.sFrames == 0 then
     -- game screen size = {1,3,210,160}
-    newState[step%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
+    newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
     if opt.useGPU then newState = newState:cuda() end
     if reward ~= 0 then
       nRewards = nRewards + 1
@@ -249,7 +250,7 @@ while step < opt.steps do
 
   -- save results if needed:
   if step % opt.saveFreq == 0 then
-    torch.save( opt.savedir .. '/DQN_model' .. step .. ".net", model = model:clone():float() )
+    torch.save( opt.savedir .. '/DQN_model' .. step .. ".net", model:clone():float() )
   end
 
 
