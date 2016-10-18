@@ -145,11 +145,10 @@ while step < opt.steps do
 
   -- learning function for training our neural net:
   local eval_E = function(w)
-    local f = 0
     model:zeroGradParameters()
-    f = f + criterion:forward(output, target)
+    local f = criterion:forward(output, target)
     local dE_dy = criterion:backward(output, target)
-    model:backward(input,dE_dy)
+    model:backward(input, dE_dy)
     return f, dE_dw -- return f and df/dX
   end
 
