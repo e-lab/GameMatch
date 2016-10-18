@@ -253,9 +253,8 @@ while step < opt.steps do
   if step % opt.progFreq == 0 then
     print('==> iteration = ' .. step ..
       ', number rewards ' .. nRewards .. ', total reward ' .. totalReward ..
-      -- string.format(', average loss = %.2f', err) ..
+      string.format(', average loss = %.f', err) ..
       string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate .. 
-      string.format(', error %f', err) ..
       string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
     print('Action histogram:', aHist:view(1,#gameActions))
