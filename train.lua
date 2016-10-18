@@ -25,7 +25,7 @@ opt = lapp [[
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
-  --seed                  (default 1)         initial random seed
+  --seed                  (default 9999910101)         initial random seed
   -r,--learningRate       (default 0.001)     learning rate
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
@@ -124,6 +124,7 @@ end
 
 -- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
 local win = nil
+local aHist = torch.zeros(#gameActions)
 local input, newinput, output, target, state, newState, outNet, value, actionIdx
 local step = 0
 local bufStep = 1 -- easy way to keep buffer index
@@ -166,7 +167,7 @@ while step < opt.steps do
     else
       value, actionIdx = outNet:max(1) -- select max output
       actionIdx = actionIdx[1] -- select action from neural net
-      -- print('action', actionIdx)
+      aHist[actionIdx] = aHist[actionIdx]+1
     end
   end
 
@@ -244,6 +245,8 @@ while step < opt.steps do
       string.format(', error %f', err) ..
       string.format(', step time %.2f [ms]', sys.toc()*1000)
     )
+    print('Action histogram:', aHist:view(1,#gameActions))
+    aHist:zero()
     err = 0 -- reset after reporting period
   end
   
