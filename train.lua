@@ -36,7 +36,7 @@ opt = lapp [[
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
   --steps                 (default 1e6)       number of training steps to perform
   --progFreq              (default 1e3)       frequency of progress output
-  --testFreq              (default 1e3)       frequency of testing
+  --testFreq              (default 1e9)       frequency of testing
   --evalSteps             (default 1e4)       number of test games to play to test results
   --useGPU                                    use GPU in training
 
