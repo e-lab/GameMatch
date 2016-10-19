@@ -21,7 +21,7 @@ opt = lapp [[
   --pool_frms_size      (default '1')               pool inputs frames size
   --actrep              (default 1)                 how many times to repeat action
   --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
-  --gamma               (default 0.975)             discount factor in learning
+  --gamma               (default 0.99)              discount factor in learning
   --epsilon             (default 1)                 initial value of ϵ-greedy action selection
   
   Training parameters:
@@ -230,7 +230,7 @@ while step < opt.steps do
     local val, update
     for i=1,opt.batchSize do
       target[i] = output[i] -- get target vector at 'state'
-      -- print('\n\n\ntarget:', target[i]:view(1,-1))
+      -- print('target:', target[i]:view(1,-1))
       -- update from newState:
       if buffer[ri[i]].terminal then
         update = buffer[ri[i]].reward
@@ -240,7 +240,7 @@ while step < opt.steps do
       end
       target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
       -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
-      -- print('action', buffer[ri[i]].action)
+      -- print('action', buffer[ri[i]].action, '\n\n\n')
     end
     if opt.useGPU then target = target:cuda() end
 
