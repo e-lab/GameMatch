@@ -154,7 +154,7 @@ while step < opt.steps do
     dE_dw:zero()
     local f = criterion:forward(output, target)
     local dE_dy = criterion:backward(output, target)
-    -- print(dE_dy[1]:view(1,-1))
+    -- print(dE_dy[1]:view(1,-1), target)
     -- logger:add(torch.totable(dE_dy)[1])
     -- logger:plot()
     model:backward(input, dE_dy)
@@ -215,10 +215,10 @@ while step < opt.steps do
   if bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
     -- create next training batch:
     local ri = torch.randperm(#buffer)
-    for i=1,opt.batchSize do
+    for i = 1, opt.batchSize do
       -- print('indices:', i, ri[i])
-      input[i] = buffer[ri[i]].state:cuda()
-      newinput[i] = buffer[ri[i]].newState:cuda()
+      input[i] = opt.useGPU and buffer[ri[i]].state:cuda() or buffer[ri[i]].state
+      newinput[i] = opt.useGPU and buffer[ri[i]].newState:cuda() or buffer[ri[i]].newState
     end
     newOutput = model:forward(newinput):clone() -- get output at 'newState' (clone to avoid losing it next model forward!)
     output = model:forward(input) -- get output at state for backprop
@@ -235,8 +235,9 @@ while step < opt.steps do
         val = newOutput[i]:max() -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma * val
       end
-      target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
-      -- print('new target:', target[i]:view(1,-1), 'action', buffer[ri[i]].action)
+      target[i][buffer[ri[i]].action] = 2*update -- target is previous output updated with reward
+      -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
+      -- print('action', buffer[ri[i]].action)
     end
     if opt.useGPU then target = target:cuda() end
 
