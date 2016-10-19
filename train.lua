@@ -3,6 +3,7 @@
 -- Deep Q learning code
 -- an implementation of: http://www.nature.com/nature/journal/v518/n7540/full/nature14236.html
 -- inspired by: http://outlace.com/Reinforcement-Learning-Part-3/
+-- or: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
 if not dqn then
     require "initenv"
@@ -122,7 +123,7 @@ if opt.useGPU then
 end
 
 
--- online training: algorithm from: http://outlace.com/Reinforcement-Learning-Part-3/
+-- online training:
 local win = nil
 local aHist = torch.zeros(#gameActions)
 local input, newinput, output, target, state, newState, outNet, value, actionIdx
