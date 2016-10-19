@@ -40,6 +40,7 @@ opt = lapp [[
   --testFreq              (default 1e9)       frequency of testing
   --evalSteps             (default 1e4)       number of test games to play to test results
   --useGPU                                    use GPU in training
+  --gpuId                 (default 1)         which GPU to use
 
   Display and save parameters:
   --zoom                  (default 4)     zoom window
@@ -97,9 +98,10 @@ print('Number of grads ' .. dE_dw:nElement())
 if opt.useGPU then
   require 'cunn'
   require 'cutorch'
+  cutorch.setDevice(opt.gpuId)
   model:cuda()
   criterion:cuda()
-  print('Using GPU')
+  print('Using GPU number', opt.gpuId)
 end
 
 --- set up random number generators
@@ -236,7 +238,7 @@ while step < opt.steps do
         val = newOutput[i]:max() -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma * val
       end
-      target[i][buffer[ri[i]].action] = 2*update -- target is previous output updated with reward
+      target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
       -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
       -- print('action', buffer[ri[i]].action)
     end
