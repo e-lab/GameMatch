@@ -24,10 +24,10 @@ GAME = 'bird' # the name of the game being played for log files
 CONFIG = 'nothreshold'
 ACTIONS = 2 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
-OBSERVATION = 3200. # timesteps to observe before training
+OBSERVATION = 32. # timesteps to observe before training
 EXPLORE = 3000000. # frames over which to anneal epsilon
-FINAL_EPSILON = 0.0001 # final value of epsilon
-INITIAL_EPSILON = 0.1 # starting value of epsilon
+FINAL_EPSILON = 0.1 # final value of epsilon
+INITIAL_EPSILON = 1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
 BATCH = 32 # size of minibatch
 FRAME_PER_ACTION = 1
@@ -37,7 +37,6 @@ img_rows , img_cols = 80, 80
 img_channels = 4 #We stack 4 frames
 
 def buildmodel():
-    print("Now we build the model")
     model = nn.Sequential()
     model._add(nn.SpatialConvolution(img_channels,32,8,8,4,4))
     model._add(nn.ReLU())
@@ -52,7 +51,6 @@ def buildmodel():
 
     model.criterion = nn.MSECriterion()
 
-    print("We finish building the model")
     # print(model._forward(torch.Tensor(4,80,80))) # test
     return model
 
@@ -77,15 +75,15 @@ def trainNetwork(model,args):
     #In Keras, need to reshape
     s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2])
 
-    if args['mode'] == 'Run':
-        OBSERVE = 999999999    #We keep observe, never train
+    if args['mode'] == 'Run': # evaluation mode:
+        OBSERVE = 999999999 
         epsilon = FINAL_EPSILON
         print ("Now we load weight")
         # model.load_weights("model.h5")
         # adam = Adam(lr=1e-6)
         # model.compile(loss='mse',optimizer=adam)
         # print ("Weight load successfully")    
-    else:                       #We go to training mode
+    else: # training mode
         OBSERVE = OBSERVATION
         epsilon = INITIAL_EPSILON
 
@@ -169,12 +167,10 @@ def trainNetwork(model,args):
         s_t = s_t1
         t = t + 1
 
-        # save progress every 10000 iterations
-        if t % 100 == 0:
-            print("Now we save model")
-            # model.save_weights("model.h5", overwrite=True)
-            # with open("model.json", "w") as outfile:
-                # json.dump(model.to_json(), outfile)
+        # save progress every few iterations
+        if t % 10000 == 0:
+            print("Saving model")
+            torch.save("model_"+str(t)+".net", model._clone()._clearState()._float())
 
         # print info
         state = ""
@@ -193,7 +189,10 @@ def trainNetwork(model,args):
     print("************************")
 
 def playGame(args):
+    print('Building model...')
     model = buildmodel()
+    print('the model is:', model)
+    print('Training...')
     trainNetwork(model,args)
 
 def main():
