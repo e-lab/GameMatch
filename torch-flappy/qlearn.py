@@ -24,7 +24,7 @@ GAME = 'bird' # the name of the game being played for log files
 CONFIG = 'nothreshold'
 ACTIONS = 2 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
-OBSERVATION = 32. # timesteps to observe before training
+OBSERVATION = 3200. # timesteps to observe before training
 EXPLORE = 3000000. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.1 # final value of epsilon
 INITIAL_EPSILON = 1 # starting value of epsilon
@@ -158,10 +158,10 @@ def trainNetwork(model,args):
             tt = torch.fromNumpyArray(targets)._float()
 
             model._zeroGradParameters()
-            loss = model.criterion._forward(oo, tt)
+            loss = loss + model.criterion._forward(oo, tt)
             dE_dy = model.criterion._backward(oo, tt)
             model._backward(ii, dE_dy)
-            model._updateParameters(0.001)
+            model._updateParameters(2.5e-4)
             # loss += model.train_on_batch(inputs, targets)
 
         s_t = s_t1
