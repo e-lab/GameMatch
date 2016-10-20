@@ -68,7 +68,7 @@ def trainNetwork(model,args):
 
     x_t = skimage.color.rgb2gray(x_t)
     x_t = skimage.transform.resize(x_t,(80,80))
-    x_t = skimage.exposure.rescale_intensity(x_t,out_range=(0,255))
+    x_t = skimage.exposure.rescale_intensity(x_t,out_range=(0,1))
 
     s_t = np.stack((x_t, x_t, x_t, x_t), axis=0)
 
@@ -115,7 +115,7 @@ def trainNetwork(model,args):
 
         x_t1 = skimage.color.rgb2gray(x_t1_colored)
         x_t1 = skimage.transform.resize(x_t1,(80,80))
-        x_t1 = skimage.exposure.rescale_intensity(x_t1, out_range=(0, 255))
+        x_t1 = skimage.exposure.rescale_intensity(x_t1, out_range=(0, 1))
 
         x_t1 = x_t1.reshape(1, 1, x_t1.shape[0], x_t1.shape[1])
         s_t1 = np.append(x_t1, s_t[:, :3, :, :], axis=1)
@@ -126,7 +126,7 @@ def trainNetwork(model,args):
             D.popleft()
 
         #only train if done observing
-        if t > OBSERVE:
+        if t > 32: #OBSERVE:
             #sample a minibatch to train on
             minibatch = random.sample(D, BATCH)
 
@@ -143,7 +143,6 @@ def trainNetwork(model,args):
                 # if terminated, only equals reward
 
                 inputs[i:i + 1] = state_t    #I saved down s_t
-
                 targets[i] = model._forward( torch.fromNumpyArray(state_t)._float() ).asNumpyArray()
                 Q_sa = model._forward( torch.fromNumpyArray(state_t1)._float() ).asNumpyArray()
 
