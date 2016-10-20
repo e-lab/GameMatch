@@ -43,7 +43,7 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --imSize                (default 24)        state is screen resized to this size 
-  --batchSize             (default 128)       batch size for training
+  --batchSize             (default 32)        batch size for training
   --ERBufSize             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
   --steps                 (default 1e4)       number of training steps to perform
