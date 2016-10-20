@@ -146,6 +146,9 @@ def trainNetwork(model,args):
                 targets[i] = model._forward( torch.fromNumpyArray(state_t)._float() ).asNumpyArray()
                 Q_sa = model._forward( torch.fromNumpyArray(state_t1)._float() ).asNumpyArray()
 
+                reward_t = np.clip(reward_t,-1,1) # clip reward to keep neural network from exploding
+                Q_sa = np.clip(Q_sa,-1,1)
+
                 if terminal:
                     targets[i, action_t] = reward_t
                 else:
