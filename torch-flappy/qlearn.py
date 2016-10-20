@@ -30,7 +30,7 @@ FINAL_EPSILON = 0.1 # final value of epsilon
 INITIAL_EPSILON = 1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
 BATCH = 32 # size of minibatch
-FRAME_PER_ACTION = 1
+FRAME_PER_ACTION = 4
 
 img_rows , img_cols = 80, 80
 #Convert image into Black and white
@@ -93,9 +93,9 @@ def trainNetwork(model,args):
         Q_sa = 0
         action_index = 0
         r_t = 0
-        a_t = np.zeros([ACTIONS])
         #choose an action epsilon greedy
         if t % FRAME_PER_ACTION == 0:
+            a_t = np.zeros([ACTIONS])
             if random.random() <= epsilon:
                 print("----------Random Action----------")
                 action_index = random.randint(0, ACTIONS-1)
@@ -126,12 +126,12 @@ def trainNetwork(model,args):
             D.popleft()
 
         #only train if done observing
-        if t > 32: #OBSERVE:
+        if t > OBSERVE:
             #sample a minibatch to train on
             minibatch = random.sample(D, BATCH)
 
             inputs = np.zeros((BATCH, s_t.shape[1], s_t.shape[2], s_t.shape[3]))   #32, 80, 80, 4
-            targets = np.zeros((inputs.shape[0], ACTIONS))                         #32, 2
+            targets = np.zeros((BATCH, ACTIONS))                         #32, 2
            
             #Now we do the experience replay
             for i in range(0, len(minibatch)):
@@ -160,7 +160,7 @@ def trainNetwork(model,args):
             loss = loss + model.criterion._forward(oo, tt)
             dE_dy = model.criterion._backward(oo, tt)
             model._backward(ii, dE_dy)
-            model._updateParameters(2.5e-4)
+            model._updateParameters(0.1)
             # loss += model.train_on_batch(inputs, targets)
 
         s_t = s_t1
