@@ -193,6 +193,7 @@ while step < opt.steps do
           screen, reward, terminal = gameEnv:newGame()
       end
   end
+  reward:clamp(-1, 1) -- clamp reward to keep neural net from exploding
 
   -- count rewards:
   if reward ~= 0 then
@@ -240,6 +241,7 @@ while step < opt.steps do
         val = newOutput[i]:max() -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma * val
       end
+      update:clamp(-1, 1) -- clamp update to keep neural net from exploding
       target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
       -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
       -- print('action', buffer[ri[i]].action, '\n\n\n')
