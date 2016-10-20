@@ -6,13 +6,14 @@
 -- or: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
 -- playing CATCH version:
+-- https://github.com/Kaixhin/rlenvs
 
 -- if not dqn then
     -- require "initenv"
 -- end
 
 local image = require 'image'
-local Catch = require 'rlenvs/Catch'
+local Catch = require 'rlenvs/Catch' -- install: https://github.com/Kaixhin/rlenvs
 require 'torch'
 require 'nn'
 require 'nngraph'
