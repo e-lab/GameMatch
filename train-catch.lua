@@ -76,8 +76,11 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
+-- Clamps a number to within a certain range.
+function math.clamp(n, low, high) return math.min(math.max(low, n), high) end
+
 -- Detect QT for image display
-local qt = pcall(require, 'qt')
+-- local qt = pcall(require, 'qt')
 
 --- General setup:
 -- local gameEnv, gameActions, agent, opt = setup(opt)
@@ -236,7 +239,7 @@ while step < opt.steps do
     screen = gameEnv:start()
     terminal = false
   end
-  reward:clamp(-1, 1) -- clamp reward to keep neural net from exploding
+  reward = math.clamp(reward, -1, 1) -- clamp reward to keep neural net from exploding
 
   -- count rewards:
   if reward ~= 0 then
@@ -283,7 +286,7 @@ while step < opt.steps do
         val = newOutput[i]:max() -- computed at 'newState'
         update = buffer[ri[i]].reward + gamma * val
       end
-      update:clamp(-1, 1) -- clamp update to keep neural net from exploding
+      update = math.clamp(update, -1, 1) -- clamp update to keep neural net from exploding
       target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
       -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
       -- print('action', buffer[ri[i]].action, '\n\n\n')
