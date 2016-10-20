@@ -5,9 +5,20 @@
 -- inspired by: http://outlace.com/Reinforcement-Learning-Part-3/
 -- or: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
-if not dqn then
-    require "initenv"
-end
+-- playing CATCH version:
+
+-- if not dqn then
+    -- require "initenv"
+-- end
+
+local image = require 'image'
+local Catch = require 'rlenvs/Catch'
+require 'torch'
+require 'nn'
+require 'nngraph'
+require 'image'
+require 'optim'
+
 require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
@@ -31,12 +42,12 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --imSize                (default 84)        state is screen resized to this size 
-  --batchSize             (default 256)       batch size for training
-  --ERBufSize             (default 1e5)       Experience Replay buffer memory
+  --imSize                (default 24)        state is screen resized to this size 
+  --batchSize             (default 128)       batch size for training
+  --ERBufSize             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --steps                 (default 1e6)       number of training steps to perform
-  --progFreq              (default 1e3)       frequency of progress output
+  --steps                 (default 1e4)       number of training steps to perform
+  --progFreq              (default 1e2)       frequency of progress output
   --testFreq              (default 1e9)       frequency of testing
   --evalSteps             (default 1e4)       number of test games to play to test results
   --useGPU                                    use GPU in training
@@ -53,21 +64,31 @@ opt = lapp [[
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
 opt.saveFreq = opt.steps / 10 -- save 10 times in total
 
-if opt.verbose >= 1 then
-    print('Using options:')
-    for k, v in pairs(opt) do
-        print(k, v)
-    end
-end
+-- if opt.verbose >= 1 then
+    -- print('Using options:')
+    -- for k, v in pairs(opt) do
+        -- print(k, v)
+    -- end
+-- end
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
+-- Detect QT for image display
+local qt = pcall(require, 'qt')
 
 --- General setup:
-local gameEnv, gameActions, agent, opt = setup(opt)
+-- local gameEnv, gameActions, agent, opt = setup(opt)
+local gameEnv = Catch({level = 2})
+local stateSpec = gameEnv:getStateSpec()
+local actionSpec = gameEnv:getActionSpec()
+local observation = gameEnv:start()
+print('screen size is:', observation:size())
+-- print(stateSpec,actionSpec)
+gameActions = {0,1,2} -- game actions from CATCH
+-- print(gameActions, #gameActions)
 
 -- set parameters and vars:
 local epsilon = opt.epsilon -- ϵ-greedy action selection
@@ -84,11 +105,37 @@ local totalReward = 0
 local nRewards = 0
 
 -- start a new game, here screen == state
-local screen, reward, terminal = gameEnv:getState()
+-- local screen, reward, terminal = gameEnv:getState()
+local reward, screen, terminal = gameEnv:step()
 
 -- get model:
 local model, criterion
-model, criterion = createModel(#gameActions, opt.sFrames)
+local net = nn.Sequential()
+-- layer 1
+net:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
+net:add(nn.ReLU())
+net:add(nn.SpatialMaxPooling(2,2,2,2))
+-- layer 2
+net:add(nn.SpatialConvolution(32,64,3,3,1,1))
+net:add(nn.ReLU())
+net:add(nn.SpatialMaxPooling(2,2,2,2))
+-- layer 3
+net:add(nn.SpatialConvolution(64,64,3,3,1,1))
+net:add(nn.ReLU())
+net:add(nn.SpatialMaxPooling(2,2,2,2))
+-- classifier
+net:add(nn.View(64))
+net:add(nn.Linear(64, 32))
+net:add(nn.ReLU())
+net:add(nn.Linear(32, #gameActions))
+
+-- model, criterion = createModel(#gameActions, opt.sFrames)
+model = net
+criterion = nn.MSECriterion() 
+
+-- test:
+-- print(model:forward(torch.Tensor(4,24,24)))
+
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
 print('Number of parameters ' .. w:nElement())
@@ -110,19 +157,19 @@ end
 -- this is preferred because using the same seed for both generators
 -- may introduce correlations; we assume that both torch RNGs ensure
 -- adequate dispersion for different seeds.
-math.random = nil
-opt.seed = opt.seed or 1
-torch.manualSeed(opt.seed)
-if opt.verbose >= 1 then
-    print('Torch Seed:', torch.initialSeed())
-end
-local firstRandInt = torch.random()
-if opt.useGPU then
-    cutorch.manualSeed(firstRandInt)
-    if opt.verbose >= 1 then
-        print('CUTorch Seed:', cutorch.initialSeed())
-    end
-end
+-- math.random = nil
+-- opt.seed = opt.seed or 1
+-- torch.manualSeed(opt.seed)
+-- if opt.verbose >= 1 then
+--     print('Torch Seed:', torch.initialSeed())
+-- end
+-- local firstRandInt = torch.random()
+-- if opt.useGPU then
+--     cutorch.manualSeed(firstRandInt)
+--     if opt.verbose >= 1 then
+--         print('CUTorch Seed:', cutorch.initialSeed())
+--     end
+-- end
 
 
 -- online training:
@@ -167,9 +214,8 @@ while step < opt.steps do
   -- we compute new actions only every few frames
   if step == 1 or step % opt.sFrames == 0 then
     -- We are in state S, now use model to get next action:
-    -- game screen size = {1,3,210,160}
-    -- state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
-    state[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
+    -- game screen size = {1,24,24}
+    state[(step/opt.sFrames)%opt.sFrames+1] = screen -- scale screen, average color planes
     if opt.useGPU then state = state:cuda() end
     outNet = model:forward(state)
 
@@ -185,13 +231,10 @@ while step < opt.steps do
 
   -- repeat the move >>> every step <<< (while learning happens only every opt.QLearnFreq)
   if not terminal then
-      screen, reward, terminal = gameEnv:step(gameActions[actionIdx], true)
+    reward, screen, terminal = gameEnv:step(gameActions[actionIdx])
   else
-      if opt.randomStarts > 0 then
-          screen, reward, terminal = gameEnv:nextRandomGame()
-      else
-          screen, reward, terminal = gameEnv:newGame()
-      end
+    screen = gameEnv:start()
+    terminal = false
   end
 
   -- count rewards:
@@ -202,9 +245,8 @@ while step < opt.steps do
 
   -- compute action in newState and save to Experience Replay memory:
   if step > 1 and step % opt.sFrames == 0 then
-    -- game screen size = {1,3,210,160}
-    -- newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen, average color planes
-    newState[(step/opt.sFrames)%opt.sFrames+1] = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize):sum(1):div(3) -- scale screen -- resize to smaller portion
+    -- game screen size = {1,24,24}
+    newState[(step/opt.sFrames)%opt.sFrames+1] = screen -- scale screen, average color planes
     if opt.useGPU then state = state:cuda() end
     if opt.useGPU then newState = newState:cuda() end
 
@@ -286,8 +328,7 @@ while step < opt.steps do
     local testTime = sys.clock()
     for estep = 1, opt.evalSteps do
 
-      local state = image.scale(screen[1], opt.imSize, opt.imSize) -- scale screen
-      -- state = image.scale(screen[1][{{},{94,194},{9,152}}], opt.imSize, opt.imSize) -- scale screen -- resize to smaller portion
+      local state = screen
       if opt.useGPU then state = state:cuda() end
       local outTest = model:forward(state)
 
