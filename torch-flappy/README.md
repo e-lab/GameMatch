@@ -1,17 +1,20 @@
-# Keras-FlappyBird
+# Torch7-FlappyBird
 
-A single 200 lines of python code to demostrate DQN with Keras
+A single 200 lines of python code to demostrate DQN with Torch7
 
 Please read the following blog for details
 
 https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
+
+Modifier by Eugenio Culurciello to work on Torch7
 
 ![](animation1.gif)
 
 # Installation Dependencies:
 
 * Python 2.7
-* Keras 1.0 
+* Torch7
+* lutorpy
 * pygame
 * scikit-image
 
