@@ -107,7 +107,7 @@ size = opt.size
 seq     = opt.seq
 freq    = opt.freq
 maxFram = size*seq*freq
-container = torch.FloatTensor(size,seq,3,84,84):fill(0)
+container = torch.ByteTensor(size,seq,3,84,84):fill(0)
 collectgarbage()
 function main()
     collectgarbage()
@@ -139,12 +139,14 @@ function main()
              seqIdx = math.floor(sampleFrame % seq) + 1
              print('idx: ' , idx)
              print('seqIdx : ',seqIdx)
-             tmp = image.scale(screen[1], 84, 84, 'bilinear')
+             local byte = screen[1]*255
+             byte = byte:byte()
+             byte = image.scale(byte, 84, 84, 'bilinear')
              if opt.saveImg then
                 imgName = './save/frames/'..tostring(idx)..'_'..tostring(seqIdx)..'.png'
-                image.save(imgName,screen[1]:float())
+                image.save(imgName,byte)
              end
-             container[idx][seqIdx] = tmp:float()
+             container[idx][seqIdx] = byte
              print('container sum : ',container[idx][seqIdx]:sum())
              --Save reward and terminal along with screen
              frames[seqIdx] = {action_index, reward, terminal}

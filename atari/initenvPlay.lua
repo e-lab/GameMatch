@@ -8,7 +8,6 @@ dqn = {}
 require 'torch'
 require 'nn'
 require 'image'
-require 'Scale'
 
 
 function torchSetup(_opt)
