@@ -11,6 +11,8 @@ local stateSpec = env:getStateSpec()
 local actionSpec = env:getActionSpec()
 local observation = env:start()
 
+print('State size is:', observation:size())
+
 local reward, terminal
 local episodes, totalReward = 0, 0
 local nSteps = 1000 * (stateSpec[2][2] - 1) -- Run for 1000 episodes
@@ -24,7 +26,7 @@ for i = 1, nSteps do
   -- Pick random action and execute it
   local netOut = model:forward(observation)
   local max, index = torch.max(netOut, 1)
-  action = index[1]
+  local action = index[1]
   
   reward, observation, terminal = env:step(action)
   totalReward = totalReward + reward
