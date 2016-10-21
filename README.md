@@ -66,3 +66,7 @@ This is a python to Torch7 example, based on this: https://yanpanlau.github.io/2
 This code is very slow and we did not run long enough to see it converge. It may need to be converted to GPU!
 
 
+# Notes:
+
+A great library for RL with Torch and openai gym is:
+https://github.com/ludc/rltorch
