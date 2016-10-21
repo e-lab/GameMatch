@@ -122,6 +122,7 @@ function main()
     -- play game in test mode (episodes don't end when losing a life)
     -- reward = score added, terminal = end of game (all lives gone)
     collectgarbage()
+    --Stop saving option
     if action_index == 1 or idx == size then save = false print('Stop sampling') end
     if save then
        screen, reward, terminal = game_env:step(game_actions[action_index], false)
@@ -131,14 +132,22 @@ function main()
        frame = frame+1
        print(frame)
        --Save frame based on freq and seq and maxFrm
+       local flag = false
        if frame ~= maxFram then
        collectgarbage()
           if frame % freq == 0 then
+             flag = true
+          elseif reward > 0 or action_index == 3 or action_index == 4 then
+             flag = true
+          end
+          if flag then
              sampleFrame = math.floor(frame/freq)
              idx    = math.floor(sampleFrame / seq) + 1
              seqIdx = math.floor(sampleFrame % seq) + 1
              print('idx: ' , idx)
              print('seqIdx : ',seqIdx)
+             print('action_index :', action_index)
+             --Convert to byte
              local byte = screen[1]*255
              byte = byte:byte()
              byte = image.scale(byte, 84, 84, 'bilinear')
@@ -147,26 +156,6 @@ function main()
                 image.save(imgName,byte)
              end
              container[idx][seqIdx] = byte
-             print('container sum : ',container[idx][seqIdx]:sum())
-             --Save reward and terminal along with screen
-             frames[seqIdx] = {action_index, reward, terminal}
-             --Save to table with seq
-             if sampleFrame %  seq == 0 then
-                file[idx-1] = frames
-                frames = {}
-             end
-          elseif reward > 0 then
-             sampleFrame = math.floor(frame/freq)
-             idx    = math.floor(sampleFrame / seq) + 1
-             seqIdx = math.floor(sampleFrame % seq) + 1
-             print('idx: ' , idx)
-             print('seqIdx : ',seqIdx)
-             screen = screen:squeeze():byte()
-             if opt.saveImg then
-                imgName = './save/frames/'..tostring(idx)..'_'..tostring(seqIdx)..'.png'
-                image.save(imgName,screen)
-             end
-             container[idx][seqIdx] = screen
              --Save reward and terminal along with screen
              frames[seqIdx] = {action_index, reward, terminal}
              --Save to table with seq
@@ -179,8 +168,6 @@ function main()
           save = false
        end
     end
-    -- print(reward, terminal)
-
     if not save then
        print ('save frames')
        torch.save(filePath..'/actionTable.t7',file)
@@ -188,24 +175,7 @@ function main()
        qt.disconnect(qtimer,'timeout()',main)
     end
 
-    -- create gd image from tensor
-    -- jpg = image.compressJPG(screen:squeeze(), 100)
-    -- im = gd.createFromJpegStr(jpg:storage():string())
-
-    -- use palette from previous (first) image
-    -- im:trueColorToPalette(false, 256)
-    -- im:paletteCopy(previm)
-
-    -- write new GIF frame, no local palette, starting from left-top, 7ms delay
-    -- im:gifAnimAdd(gif_filename, false, 0, 0, 7, gd.DISPOSAL_NONE)
-    -- remember previous screen for optimal compression
-    -- previm = im
 end
-
--- end GIF animation and close CSV file
--- gd.gifAnimEnd(gif_filename)
--- print("Finished playing, close window to exit!")
-
 
 -- game controls
 print('Game controls: left / right')
