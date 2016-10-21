@@ -70,3 +70,7 @@ This code is very slow and we did not run long enough to see it converge. It may
 
 A great library for RL with Torch and openai gym is:
 https://github.com/ludc/rltorch
+
+Doom for OS X: https://github.com/soumith/ViZDoom
+
+
