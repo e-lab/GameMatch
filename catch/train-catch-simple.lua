@@ -1,10 +1,18 @@
 -- Eugenio Culurciello
 -- October 2016
 -- Deep Q learning code
+-- an implementation of: http://www.nature.com/nature/journal/v518/n7540/full/nature14236.html
+-- inspired by: http://outlace.com/Reinforcement-Learning-Part-3/
+-- or: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
 -- playing CATCH version:
 -- https://github.com/Kaixhin/rlenvs
 
+-- this version 
+
+-- if not dqn then
+    -- require "initenv"
+-- end
 
 local image = require 'image'
 local Catch = require 'rlenvs/Catch' -- install: https://github.com/Kaixhin/rlenvs
@@ -54,6 +62,17 @@ opt = lapp [[
   --display                               display stuff
   --savedir      (default './results')    subdirectory to save experiments in
 ]]
+
+-- format options:
+-- opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
+-- opt.saveFreq = opt.steps / 10 -- save 10 times in total
+
+-- if opt.verbose >= 1 then
+    -- print('Using options:')
+    -- for k, v in pairs(opt) do
+        -- print(k, v)
+    -- end
+-- end
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -149,29 +168,24 @@ local reward, screen, terminal = gameEnv:step()
 local model, criterion
 local net = nn.Sequential()
 -- layer 1
-net:add(nn.SpatialConvolution(1,32,3,3,1,1))
+net:add(nn.SpatialConvolution(1,8,5,5,2,2))
 net:add(nn.ReLU())
 net:add(nn.SpatialMaxPooling(2,2,2,2))
 -- layer 2
-net:add(nn.SpatialConvolution(32,64,3,3,1,1))
+net:add(nn.SpatialConvolution(8,16,5,5,1,1))
 net:add(nn.ReLU())
-net:add(nn.SpatialMaxPooling(2,2,2,2))
--- layer 3
-net:add(nn.SpatialConvolution(64,64,3,3,1,1))
-net:add(nn.ReLU())
-net:add(nn.SpatialMaxPooling(2,2,2,2))
 -- classifier
-net:add(nn.View(64))
-net:add(nn.Linear(64, 32))
-net:add(nn.ReLU())
-net:add(nn.Linear(32, #gameActions))
+net:add(nn.View(16))
+-- net:add(nn.Linear(32, 16))
+-- net:add(nn.ReLU())
+net:add(nn.Linear(16, #gameActions))
 
 -- model, criterion = createModel(#gameActions, opt.sFrames)
 model = net
 criterion = nn.MSECriterion() 
 
 -- test:
--- print(model:forward(torch.Tensor(4,24,24)))
+print(model:forward(torch.Tensor(1,24,24)))
 
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
@@ -241,52 +255,56 @@ local memory = Memory(maxMemory, discount)
 local win
 local winCount = 0
 for i = 1, epochs do
-    -- Initialize the environment
-    local err = 0
-    local isGameOver = false
+  sys.tic()
+  -- Initialize the environment
+  local err = 0
+  local isGameOver = false
 
-    -- The initial state of the environment
-    local currentState = gameEnv:start()
+  -- The initial state of the environment
+  local currentState = gameEnv:start()
 
-    while (isGameOver ~= true) do
-        local action
-        -- Decides if we should choose a random action, or an action from the policy network.
-        if math.random() < epsilon then
-            action = math.random(1, #gameActions)
-        else
-            -- Forward the current state through the network.
-            local q = model:forward(currentState)
-            -- Find the max index (the chosen action).
-            local max, index = torch.max(q, 1)
-            action = index[1]
-        end
-        -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
-        if (epsilon > epsilonMinimumValue) then
-            epsilon = epsilon * (1- 1/(batchSize * epochs))
-        end
-        local reward, nextState, gameOver = gameEnv:step(action)
-        if (reward == 1) then winCount = winCount + 1 end
-        memory.remember({
-            inputState = currentState,
-            action = action,
-            reward = reward,
-            nextState = nextState,
-            gameOver = gameOver
-        })
-        -- Update the current state and if the game is over.
-        currentState = nextState
-        isGameOver = gameOver
+  while (isGameOver ~= true) do
+      local action
+      -- Decides if we should choose a random action, or an action from the policy network.
+      if math.random() < epsilon then
+          action = math.random(1, #gameActions)
+      else
+          -- Forward the current state through the network.
+          local q = model:forward(currentState)
+          -- Find the max index (the chosen action).
+          local max, index = torch.max(q, 1)
+          action = index[1]
+      end
+      -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
+      if (epsilon > epsilonMinimumValue) then
+          epsilon = epsilon * (1- 1/(batchSize * epochs))
+      end
+      local reward, nextState, gameOver = gameEnv:step(action)
+      if (reward == 1) then winCount = winCount + 1 end
+      memory.remember({
+          inputState = currentState,
+          action = action,
+          reward = reward,
+          nextState = nextState,
+          gameOver = gameOver
+      })
+      -- Update the current state and if the game is over.
+      currentState = nextState
+      isGameOver = gameOver
 
-        -- We get a batch of training data to train the model
-        local inputs, targets = memory.getBatch(model, batchSize, #gameActions, gridSize)
+      -- We get a batch of training data to train the model
+      local inputs, targets = memory.getBatch(model, batchSize, #gameActions, gridSize)
 
-        -- Train the network which returns the error
-        err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+      -- Train the network which returns the error
+      err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
 
-        -- display:
-        win = image.display({image=currentState, zoom=10, win=win})
-    end
-    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d", i, err, epsilon, winCount))
+      -- display:
+      -- win = image.display({image=currentState, zoom=10, win=win})
+  end
+  if i%10 == 0 then
+    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %f", 
+                          i, err, epsilon, winCount, 1000*sys.toc()))
+  end
 end
 
 torch.save("catch-model.net", model)
