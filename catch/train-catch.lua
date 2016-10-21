@@ -111,10 +111,8 @@ local nRewards = 0
 -- local screen, reward, terminal = gameEnv:getState()
 local reward, screen, terminal = gameEnv:step()
 
-
 -- get model:
 local model, criterion
-
 
 if opt.largeModel then
   model = nn.Sequential()
