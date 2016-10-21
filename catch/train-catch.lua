@@ -54,7 +54,7 @@ opt = lapp [[
   --largeSimple                               simple model or not
 
   Display and save parameters:
-  --zoom                  (default 4)     zoom window
+  --zoom                  (default 10)    zoom window
   -v, --verbose           (default 2)     verbose output
   --display                               display stuff
   --savedir      (default './results')    subdirectory to save experiments in
@@ -138,7 +138,7 @@ end
 criterion = nn.MSECriterion() 
 
 -- test:
-print('Test model is:', model:forward(torch.Tensor(4,24,24)))
+-- print('Test model is:', model:forward(torch.Tensor(4,24,24)))
 
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
