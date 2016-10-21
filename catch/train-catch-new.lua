@@ -19,8 +19,8 @@ lapp = require 'pl.lapp'
 opt = lapp [[
   
   Game options:
-  --gamma               (default 0.99)              discount factor in learning
-  --epsilon             (default 1)                 initial value of ϵ-greedy action selection
+  --gamma               (default 0.99)        discount factor in learning
+  --epsilon             (default 1)           initial value of ϵ-greedy action selection
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
@@ -40,10 +40,10 @@ opt = lapp [[
   --largeSimple                               simple model or not
 
   Display and save parameters:
-  --zoom                  (default 4)     zoom window
-  -v, --verbose           (default 2)     verbose output
-  --display                               display stuff
-  --savedir      (default './results')    subdirectory to save experiments in
+  --zoom                  (default 4)        zoom window
+  -v, --verbose           (default 2)        verbose output
+  --display                                  display stuff
+  --savedir          (default './results')   subdirectory to save experiments in
 ]]
 
 torch.setnumthreads(opt.threads)
