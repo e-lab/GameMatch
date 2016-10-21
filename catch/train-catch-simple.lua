@@ -1,18 +1,10 @@
 -- Eugenio Culurciello
 -- October 2016
 -- Deep Q learning code
--- an implementation of: http://www.nature.com/nature/journal/v518/n7540/full/nature14236.html
--- inspired by: http://outlace.com/Reinforcement-Learning-Part-3/
--- or: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
 -- playing CATCH version:
 -- https://github.com/Kaixhin/rlenvs
 
--- this version 
-
--- if not dqn then
-    -- require "initenv"
--- end
 
 local image = require 'image'
 local Catch = require 'rlenvs/Catch' -- install: https://github.com/Kaixhin/rlenvs
@@ -25,18 +17,10 @@ require 'optim'
 require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
-
+  
   Game options:
-  --framework           (default 'alewrap')         name of training framework
-  --env                 (default 'breakout')        name of environment to use')
-  --game_path           (default 'roms/')           path to environment file (ROM)
-  --env_params          (default 'useRGB=true')     string of environment parameters
-  --pool_frms_type      (default 'max')             pool inputs frames mode
-  --pool_frms_size      (default '1')               pool inputs frames size
-  --actrep              (default 1)                 how many times to repeat action
-  --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
-  --gamma               (default 0.99)              discount factor in learning
-  --epsilon             (default 1)                 initial value of ϵ-greedy action selection
+  --gamma               (default 0.99)        discount factor in learning
+  --epsilon             (default 1)           initial value of ϵ-greedy action selection
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
@@ -45,34 +29,22 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --imSize                (default 24)        state is screen resized to this size 
+  --gridSize              (default 24)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
-  --ERBufSize             (default 1e3)       Experience Replay buffer memory
+  --maxMemory             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --steps                 (default 1e4)       number of training steps to perform
+  --epochs                (default 1e4)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
-  --testFreq              (default 1e9)       frequency of testing
-  --evalSteps             (default 1e4)       number of test games to play to test results
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
+  --largeSimple                               simple model or not
 
   Display and save parameters:
-  --zoom                  (default 4)     zoom window
-  -v, --verbose           (default 2)     verbose output
-  --display                               display stuff
-  --savedir      (default './results')    subdirectory to save experiments in
+  --zoom                  (default 4)        zoom window
+  -v, --verbose           (default 2)        verbose output
+  --display                                  display stuff
+  --savedir          (default './results')   subdirectory to save experiments in
 ]]
-
--- format options:
--- opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
--- opt.saveFreq = opt.steps / 10 -- save 10 times in total
-
--- if opt.verbose >= 1 then
-    -- print('Using options:')
-    -- for k, v in pairs(opt) do
-        -- print(k, v)
-    -- end
--- end
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -91,7 +63,7 @@ local function Memory(maxMemory, discount)
     -- Appends the experience to the memory.
     function memory.remember(memoryInput)
         table.insert(memory, memoryInput)
-        if (#memory > maxMemory) then
+        if (#memory > opt.maxMemory) then
             -- Remove the earliest memory to allocate new experience to memory.
             table.remove(memory, 1)
         end
@@ -122,7 +94,7 @@ local function Memory(maxMemory, discount)
                 -- reward + discount(gamma) * max_a' Q(s',a')
                 -- We are setting the Q-value for the action to  r + γmax a’ Q(s’, a’). The rest stay the same
                 -- to give an error of 0 for those outputs.
-                target[memoryInput.action] = memoryInput.reward + discount * nextStateMaxQ
+                target[memoryInput.action] = memoryInput.reward + opt.gamma * nextStateMaxQ
             end
             -- Update the inputs and targets.
             inputs[i] = memoryInput.inputState
@@ -166,26 +138,43 @@ local reward, screen, terminal = gameEnv:step()
 
 -- get model:
 local model, criterion
-local net = nn.Sequential()
--- layer 1
-net:add(nn.SpatialConvolution(1,8,5,5,2,2))
-net:add(nn.ReLU())
-net:add(nn.SpatialMaxPooling(2,2,2,2))
--- layer 2
-net:add(nn.SpatialConvolution(8,16,5,5,1,1))
-net:add(nn.ReLU())
--- classifier
-net:add(nn.View(16))
--- net:add(nn.Linear(32, 16))
--- net:add(nn.ReLU())
-net:add(nn.Linear(16, #gameActions))
 
--- model, criterion = createModel(#gameActions, opt.sFrames)
-model = net
+if opt.largeModel then
+  model = nn.Sequential()
+  -- layer 1
+  model:add(nn.SpatialConvolution(1,32,3,3,1,1))
+  model:add(nn.ReLU())
+  mdel:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- layer 2
+  model:add(nn.SpatialConvolution(32,64,3,3,1,1))
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- layer 3
+  model:add(nn.SpatialConvolution(64,64,3,3,1,1))
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- classifier
+  model:add(nn.View(64))
+  model:add(nn.Linear(64, 32))
+  model:add(nn.ReLU())
+  model:add(nn.Linear(32, #gameActions))
+else
+  model = nn.Sequential()
+  -- layer 1
+  model:add(nn.SpatialConvolution(1,8,5,5,2,2))
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- layer 2
+  model:add(nn.SpatialConvolution(8,16,5,5,1,1))
+  model:add(nn.ReLU())
+  -- classifier
+  model:add(nn.View(16))
+  model:add(nn.Linear(16, #gameActions))
+end
 criterion = nn.MSECriterion() 
 
 -- test:
-print(model:forward(torch.Tensor(1,24,24)))
+-- print(model:forward(torch.Tensor(4,24,24)))
 
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
@@ -203,9 +192,7 @@ if opt.useGPU then
 end
 
 
-
-
---[[ Runs one gradient update using SGD returning the loss.]] --
+-- training function:
 local function trainNetwork(model, inputs, targets, criterion, sgdParams)
     local loss = 0
     local x, gradParameters = model:getParameters()
@@ -224,24 +211,12 @@ local function trainNetwork(model, inputs, targets, criterion, sgdParams)
     return loss
 end
 
-local epsilon = 1 -- The probability of choosing a random action (in training). This decays as iterations increase. (0 to 1)
-local epsilonMinimumValue = 0.03 -- The minimum value we want epsilon to reach in training. (0 to 1)
--- local nbActions = 3 -- The number of actions. Since we only have left/stay/right that means 3 actions.
-local epochs = 10000 -- The number of games we want the system to run for.
-local hiddenSize = 100 -- Number of neurons in the hidden layers.
-local maxMemory = 5000 -- How large should the memory be (where it stores its past experiences).
-local batchSize = 32 -- The mini-batch size for training. Samples are randomly taken from memory till mini-batch size.
-local gridSize = 24 -- The size of the grid that the agent is going to play the game on.
--- local nbStates = gridSize * gridSize -- We eventually flatten to a 1d tensor for the network.
-local discount = 0.9 -- The discount is used to force the network to choose states that lead to the reward quicker (0 to 1)
-
-
 -- Params for Stochastic Gradient Descent (our optimizer).
 local sgdParams = {
-    learningRate = 0.01,
-    learningRateDecay = 1e-9,
-    weightDecay = 0,
-    momentum = 0.9,
+    learningRate = opt.learningRate,
+    learningRateDecay = opt.learningRateDecay,
+    weightDecay = opt.weightDecay,
+    momentum = opt.momentum,
     dampening = 0,
     nesterov = true
 }
@@ -251,60 +226,59 @@ local criterion = nn.MSECriterion()
 
 -- local env = --CatchEnvironment(gridSize)
 local memory = Memory(maxMemory, discount)
+local epsilon = opt.epsilon
+local epsilonMinimumValue = 0.05
 
 local win
 local winCount = 0
-for i = 1, epochs do
+for i = 1, opt.epochs do
   sys.tic()
-  -- Initialize the environment
-  local err = 0
-  local isGameOver = false
+    -- Initialize the environment
+    local err = 0
+    local isGameOver = false
 
-  -- The initial state of the environment
-  local currentState = gameEnv:start()
+    -- The initial state of the environment
+    local currentState = gameEnv:start()
 
-  while (isGameOver ~= true) do
-      local action
-      -- Decides if we should choose a random action, or an action from the policy network.
-      if math.random() < epsilon then
-          action = math.random(1, #gameActions)
-      else
-          -- Forward the current state through the network.
-          local q = model:forward(currentState)
-          -- Find the max index (the chosen action).
-          local max, index = torch.max(q, 1)
-          action = index[1]
-      end
-      -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
-      if (epsilon > epsilonMinimumValue) then
-          epsilon = epsilon * (1- 1/(batchSize * epochs))
-      end
-      local reward, nextState, gameOver = gameEnv:step(action)
-      if (reward == 1) then winCount = winCount + 1 end
-      memory.remember({
-          inputState = currentState,
-          action = action,
-          reward = reward,
-          nextState = nextState,
-          gameOver = gameOver
-      })
-      -- Update the current state and if the game is over.
-      currentState = nextState
-      isGameOver = gameOver
+    while (isGameOver ~= true) do
+        local action
+        -- random action or an action from the policy network:
+        if math.random() < epsilon then
+            action = math.random(1, #gameActions)
+        else
+            -- Forward the current state through the network:
+            local q = model:forward(currentState)
+            -- Find the max index (the chosen action):
+            local max, index = torch.max(q, 1)
+            action = index[1]
+        end
+        -- Decay epsilon
+        if (epsilon > epsilonMinimumValue) then
+            epsilon = opt.epsilon * (1- 1/(opt.batchSize * opt.epochs))
+        end
+        local reward, nextState, gameOver = gameEnv:step(action)
+        if (reward == 1) then winCount = winCount + 1 end
+        memory.remember({
+            inputState = currentState,
+            action = action,
+            reward = reward,
+            nextState = nextState,
+            gameOver = gameOver
+        })
+        -- Update the current state and if the game is over:
+        currentState = nextState
+        isGameOver = gameOver
 
-      -- We get a batch of training data to train the model
-      local inputs, targets = memory.getBatch(model, batchSize, #gameActions, gridSize)
+        -- We get a batch of training data to train the model:
+        local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
 
-      -- Train the network which returns the error
-      err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+        -- Train the network, get error:
+        err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
 
-      -- display:
-      -- win = image.display({image=currentState, zoom=10, win=win})
-  end
-  if i%10 == 0 then
-    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %f", 
-                          i, err, epsilon, winCount, 1000*sys.toc()))
-  end
+        -- display:
+        win = image.display({image=currentState, zoom=10, win=win})
+    end
+    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
 end
 
 torch.save("catch-model.net", model)

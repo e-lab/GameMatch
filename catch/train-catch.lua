@@ -64,13 +64,6 @@ opt = lapp [[
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
 opt.saveFreq = opt.steps / 10 -- save 10 times in total
 
--- if opt.verbose >= 1 then
-    -- print('Using options:')
-    -- for k, v in pairs(opt) do
-        -- print(k, v)
-    -- end
--- end
-
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
@@ -78,9 +71,6 @@ os.execute('mkdir '..opt.savedir)
 
 -- Clamps a number to within a certain range.
 function math.clamp(n, low, high) return math.min(math.max(low, n), high) end
-
--- Detect QT for image display
--- local qt = pcall(require, 'qt')
 
 --- General setup:
 -- local gameEnv, gameActions, agent, opt = setup(opt)
@@ -108,7 +98,6 @@ local totalReward = 0
 local nRewards = 0
 
 -- start a new game, here screen == state
--- local screen, reward, terminal = gameEnv:getState()
 local reward, screen, terminal = gameEnv:step()
 
 -- get model:
