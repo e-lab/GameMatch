@@ -45,14 +45,13 @@ opt = lapp [[
   -m,--momentum           (default 0.9)       momentum parameter
   --imSize                (default 24)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
-  --ERBufSize             (default 1e3)       Experience Replay buffer memory
+  --ERBufSize             (default 1e4)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --steps                 (default 1e4)       number of training steps to perform
-  --progFreq              (default 1e2)       frequency of progress output
-  --testFreq              (default 1e9)       frequency of testing
-  --evalSteps             (default 1e4)       number of test games to play to test results
+  --steps                 (default 1e5)       number of training steps to perform
+  --progFreq              (default 1e3)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
+  --largeSimple                               simple model or not
 
   Display and save parameters:
   --zoom                  (default 4)     zoom window
@@ -112,33 +111,47 @@ local nRewards = 0
 -- local screen, reward, terminal = gameEnv:getState()
 local reward, screen, terminal = gameEnv:step()
 
+
 -- get model:
 local model, criterion
-local net = nn.Sequential()
--- layer 1
-net:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
-net:add(nn.ReLU())
-net:add(nn.SpatialMaxPooling(2,2,2,2))
--- layer 2
-net:add(nn.SpatialConvolution(32,64,3,3,1,1))
-net:add(nn.ReLU())
-net:add(nn.SpatialMaxPooling(2,2,2,2))
--- layer 3
-net:add(nn.SpatialConvolution(64,64,3,3,1,1))
-net:add(nn.ReLU())
-net:add(nn.SpatialMaxPooling(2,2,2,2))
--- classifier
-net:add(nn.View(64))
-net:add(nn.Linear(64, 32))
-net:add(nn.ReLU())
-net:add(nn.Linear(32, #gameActions))
 
--- model, criterion = createModel(#gameActions, opt.sFrames)
-model = net
+
+if opt.largeModel then
+  model = nn.Sequential()
+  -- layer 1
+  model:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
+  model:add(nn.ReLU())
+  mdel:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- layer 2
+  model:add(nn.SpatialConvolution(32,64,3,3,1,1))
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- layer 3
+  model:add(nn.SpatialConvolution(64,64,3,3,1,1))
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- classifier
+  model:add(nn.View(64))
+  model:add(nn.Linear(64, 32))
+  model:add(nn.ReLU())
+  model:add(nn.Linear(32, #gameActions))
+else
+  model = nn.Sequential()
+  -- layer 1
+  model:add(nn.SpatialConvolution(opt.sFrames,8,5,5,2,2))
+  model:add(nn.ReLU())
+  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- layer 2
+  model:add(nn.SpatialConvolution(8,16,5,5,1,1))
+  model:add(nn.ReLU())
+  -- classifier
+  model:add(nn.View(16))
+  model:add(nn.Linear(16, #gameActions))
+end
 criterion = nn.MSECriterion() 
 
 -- test:
--- print(model:forward(torch.Tensor(4,24,24)))
+print('Test model is:', model:forward(torch.Tensor(4,24,24)))
 
 print('This is the model:', model)
 w, dE_dw = model:getParameters()
@@ -154,27 +167,6 @@ if opt.useGPU then
   criterion:cuda()
   print('Using GPU number', opt.gpuId)
 end
-
---- set up random number generators
--- removing lua RNG; seeding torch RNG with opt.seed and setting cutorch
--- RNG seed to the first uniform random int32 from the previous RNG;
--- this is preferred because using the same seed for both generators
--- may introduce correlations; we assume that both torch RNGs ensure
--- adequate dispersion for different seeds.
--- math.random = nil
--- opt.seed = opt.seed or 1
--- torch.manualSeed(opt.seed)
--- if opt.verbose >= 1 then
---     print('Torch Seed:', torch.initialSeed())
--- end
--- local firstRandInt = torch.random()
--- if opt.useGPU then
---     cutorch.manualSeed(firstRandInt)
---     if opt.verbose >= 1 then
---         print('CUTorch Seed:', cutorch.initialSeed())
---     end
--- end
-
 
 -- online training:
 local win = nil
@@ -295,7 +287,7 @@ while step < opt.steps do
     if opt.useGPU then target = target:cuda() end
 
     -- then train neural net:
-    _,fs = optim.adam(eval_E, w, optimState)
+    _,fs = optim.rmsprop(eval_E, w, optimState)
     err = err + fs[1]
   end
 
