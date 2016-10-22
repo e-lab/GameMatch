@@ -80,15 +80,16 @@ local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
 print('screen size is:', observation:size())
 -- print(stateSpec,actionSpec)
-gameActions = {0,1,2} -- game actions from CATCH
+local gameActions = {0,1,2} -- game actions from CATCH
 -- print(gameActions, #gameActions)
 
 -- start a new game, here screen == state
 local reward, screen, terminal = gameEnv:step()
 
 -- get model:
+local model
 if opt.largeModel then
-  local model = nn.Sequential()
+  model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
   model:add(nn.ReLU())
@@ -107,7 +108,7 @@ if opt.largeModel then
   model:add(nn.ReLU())
   model:add(nn.Linear(32, #gameActions))
 else
-  local model = nn.Sequential()
+  model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(opt.sFrames,8,5,5,2,2))
   model:add(nn.ReLU())

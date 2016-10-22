@@ -134,8 +134,9 @@ local nRewards = 0
 
 
 -- get model:
+local model
 if opt.largeModel then
-  local model = nn.Sequential()
+  model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(1,32,3,3,1,1))
   model:add(nn.ReLU())
@@ -154,7 +155,7 @@ if opt.largeModel then
   model:add(nn.ReLU())
   model:add(nn.Linear(32, #gameActions))
 else
-  local model = nn.Sequential()
+  model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(1,8,5,5,2,2))
   model:add(nn.ReLU())
