@@ -45,10 +45,10 @@ opt = lapp [[
   -m,--momentum           (default 0.9)       momentum parameter
   --imSize                (default 24)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
-  --ERBufSize             (default 1e4)       Experience Replay buffer memory
+  --ERBufSize             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 1)         input frames to stack as input / learn every update_freq steps of game
   --epochs                (default 1e4)       number of training games to play
-  --progFreq              (default 1e3)       frequency of progress output
+  --progFreq              (default 1e2)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
   --largeSimple                               simple model or not
@@ -87,10 +87,8 @@ gameActions = {0,1,2} -- game actions from CATCH
 local reward, screen, terminal = gameEnv:step()
 
 -- get model:
-local model, criterion
-
 if opt.largeModel then
-  model = nn.Sequential()
+  local model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
   model:add(nn.ReLU())
@@ -109,7 +107,7 @@ if opt.largeModel then
   model:add(nn.ReLU())
   model:add(nn.Linear(32, #gameActions))
 else
-  model = nn.Sequential()
+  local model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(opt.sFrames,8,5,5,2,2))
   model:add(nn.ReLU())
@@ -121,7 +119,7 @@ else
   model:add(nn.View(16))
   model:add(nn.Linear(16, #gameActions))
 end
-criterion = nn.MSECriterion() 
+local criterion = nn.MSECriterion() 
 
 -- test:
 -- print('Test model is:', model:forward(torch.Tensor(4,24,24)))
@@ -182,6 +180,7 @@ function getBatch(memory, model, batchSize, nbActions, gridSize)
 
     --Gives us Q_sa, the max q for the next state.
     local nextStateMaxQ = torch.max(model:forward(memoryInput.nextState), 1)[1]
+    nextStateMaxQ = math.clamp(nextStateMaxQ, -1, 1) -- clamp updates to keep neural net from exploding
     if (memoryInput.gameOver) then
         target[memoryInput.action] = memoryInput.reward
     else
@@ -224,14 +223,15 @@ print("Started training...")
 -- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
 -- logger:style{'-', '-', '-', '-'}
 for game = 1, opt.epochs do
+  
   sys.tic()
   -- Initialize the environment
   local err = 0
-  local isGameOver = false
+  local GameOver = false
 
   local state = gameEnv:start()
 
-  while (isGameOver ~= true) do
+  while not GameOver do
     local action
     -- we compute new actions only every few frames
     -- We are in state S, now use model to get next action:
@@ -268,7 +268,7 @@ for game = 1, opt.epochs do
 
     -- Update the current state and if the game is over:
     nextState = state
-    isGameOver = terminal
+    GameOver = terminal
 
     -- Q-learning in batch mode:
       -- create next training batch:
@@ -306,13 +306,12 @@ for game = 1, opt.epochs do
     -- then train neural net:
     err = err + trainNetwork(model, inputs, targets, criterion, optimState)
   
-
     if opt.display then win = image.display({image=state, win=win, zoom=opt.zoom, title='Train'}) end
 
   end
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.1 then epsilon = epsilon - (1/opt.epochs) end
+  if epsilon > 0.05 then epsilon = epsilon*(1-1/opt.epochs) end
 
   -- display screen and print results:
   if game % opt.progFreq == 0 then
@@ -329,7 +328,7 @@ for game = 1, opt.epochs do
   
   -- save results if needed:
   if game % opt.saveFreq == 0 then
-    torch.save( opt.savedir .. '/catch_model' .. step .. ".net", model:clone():clearState():float() )
+    torch.save( opt.savedir .. '/catch_model' .. game .. ".net", model:clone():clearState():float() )
   end
 
   if game%1000 == 0 then collectgarbage() end

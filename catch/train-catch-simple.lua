@@ -132,15 +132,10 @@ local optimState = {
 local totalReward = 0
 local nRewards = 0
 
--- start a new game, here screen == state
--- local screen, reward, terminal = gameEnv:getState()
-local reward, screen, terminal = gameEnv:step()
 
 -- get model:
-local model, criterion
-
 if opt.largeModel then
-  model = nn.Sequential()
+  local model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(1,32,3,3,1,1))
   model:add(nn.ReLU())
@@ -159,7 +154,7 @@ if opt.largeModel then
   model:add(nn.ReLU())
   model:add(nn.Linear(32, #gameActions))
 else
-  model = nn.Sequential()
+  local model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(1,8,5,5,2,2))
   model:add(nn.ReLU())
@@ -171,7 +166,7 @@ else
   model:add(nn.View(16))
   model:add(nn.Linear(16, #gameActions))
 end
-criterion = nn.MSECriterion() 
+local criterion = nn.MSECriterion() 
 
 -- test:
 -- print(model:forward(torch.Tensor(4,24,24)))
@@ -263,7 +258,7 @@ for i = 1, opt.epochs do
       currentState = nextState
       isGameOver = gameOver
 
-      -- We get a batch of training data to train the model:
+      -- get a batch of training data to train the model:
       local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
 
       -- Train the network, get error:
