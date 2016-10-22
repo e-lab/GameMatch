@@ -263,4 +263,4 @@ for i = 1, opt.epochs do
   print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
 end
 
-torch.save("catch-model.net", model)
+torch.save("catch-model-dead-simple.net", model)
