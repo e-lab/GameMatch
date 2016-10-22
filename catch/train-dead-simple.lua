@@ -191,7 +191,7 @@ local sgdParams = {
     nesterov = true
 }
 
-
+-- simple state: just get ball X,Y and paddle X position and concatenate these values!
 local function getSimpleState(inState)
   local val, ballx, bally, paddlex1
   -- print(inState)
