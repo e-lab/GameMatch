@@ -117,7 +117,7 @@ local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
 print('screen size is:', observation:size())
 print({stateSpec}, {actionSpec})
-gameActions = {0,1,2} -- game actions from CATCH
+local gameActions = {0,1,2} -- game actions from CATCH
 -- print(gameActions, #gameActions)
 
 -- set parameters and vars:
