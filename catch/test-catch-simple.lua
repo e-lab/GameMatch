@@ -5,6 +5,10 @@ local Catch = require 'rlenvs/Catch' --install: https://github.com/Kaixhin/rlenv
 torch.setnumthreads(8)
 torch.setdefaulttensortype('torch.FloatTensor')
 
+local params = {...}
+local fpath = params[1]
+if not fpath then print('missing network file to test!') return end
+
 -- Initialise and start environment
 local env = Catch({level = 2})
 local stateSpec = env:getStateSpec()
@@ -17,7 +21,7 @@ local reward, terminal
 local episodes, totalReward = 0, 0
 local nSteps = 1000 * (stateSpec[2][2] - 1) -- Run for 1000 episodes
 
-local model = torch.load('catch-model.net')
+local model = torch.load(fpath)
 
 -- Display
 local win = image.display({image=observation, zoom=10})
@@ -31,7 +35,7 @@ for i = 1, nSteps do
   reward, observation, terminal = env:step(action)
   totalReward = totalReward + reward
 
-  print('Action"', action, 'reward"', reward, 'total reward:', totalReward)
+  print('Action', action, 'reward', reward, 'total reward:', totalReward)
   
   win = image.display({image=observation, zoom=10, win=win})
 

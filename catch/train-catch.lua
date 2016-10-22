@@ -46,8 +46,8 @@ opt = lapp [[
   --imSize                (default 24)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
   --ERBufSize             (default 1e4)       Experience Replay buffer memory
-  --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --steps                 (default 1e5)       number of training steps to perform
+  --sFrames               (default 1)         input frames to stack as input / learn every update_freq steps of game
+  --epochs                (default 1e4)       number of training games to play
   --progFreq              (default 1e3)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
@@ -62,7 +62,7 @@ opt = lapp [[
 
 -- format options:
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
-opt.saveFreq = opt.steps / 10 -- save 10 times in total
+opt.saveFreq = opt.epochs / 10 -- save 10 times in total
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -82,20 +82,6 @@ print('screen size is:', observation:size())
 -- print(stateSpec,actionSpec)
 gameActions = {0,1,2} -- game actions from CATCH
 -- print(gameActions, #gameActions)
-
--- set parameters and vars:
-local epsilon = opt.epsilon -- ϵ-greedy action selection
-local gamma = opt.gamma -- discount factor
-local err = 0 -- loss function error (average over opt.progFreq steps)
-local w, dE_dw
-local optimState = {
-  learningRate = opt.learningRate,
-  momentum = opt.momentum,
-  learningRateDecay = opt.learningRateDecay,
-  weightDecay = opt.weightDecay
-}
-local totalReward = 0
-local nRewards = 0
 
 -- start a new game, here screen == state
 local reward, screen, terminal = gameEnv:step()
@@ -139,11 +125,7 @@ criterion = nn.MSECriterion()
 
 -- test:
 -- print('Test model is:', model:forward(torch.Tensor(4,24,24)))
-
 print('This is the model:', model)
-w, dE_dw = model:getParameters()
-print('Number of parameters ' .. w:nElement())
-print('Number of grads ' .. dE_dw:nElement())
 
 -- use GPU, if desired:
 if opt.useGPU then
@@ -155,152 +137,201 @@ if opt.useGPU then
   print('Using GPU number', opt.gpuId)
 end
 
+-- set parameters and vars:
+local epsilon = opt.epsilon -- ϵ-greedy action selection
+
+local optimState = {
+  learningRate = opt.learningRate,
+  momentum = opt.momentum,
+  learningRateDecay = opt.learningRateDecay,
+  weightDecay = opt.weightDecay
+}
+local totalReward = 0
+local nRewards = 0
+
 -- online training:
 local win = nil
 local aHist = torch.zeros(#gameActions)
-local input, newinput, output, target, state, newState, outNet, value, actionIdx
-local step = 0
-local bufStep = 1 -- easy way to keep buffer index
-local buffer = {} -- Experience Replay buffer
-state = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
-newState = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
-input = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
-if opt.useGPU then input = input:cuda() end
-newinput = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
-if opt.useGPU then newinput = newinput:cuda() end
-target = torch.zeros(opt.batchSize, #gameActions)
-if opt.useGPU then target = target:cuda() end
+local ERmemory = {} -- Experience Replay memory
+local state = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
+local nextState = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
+-- input = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
+-- if opt.useGPU then input = input:cuda() end
+local nextInput = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
+-- if opt.useGPU then newinput = newinput:cuda() end
+local target = torch.zeros(opt.batchSize, #gameActions)
+-- if opt.useGPU then target = target:cuda() end
 
 
--- local logger = optim.Logger('gradient.log')
--- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
--- logger:style{'-', '-', '-', '-'}
+
+function getBatch(memory, model, batchSize, nbActions, gridSize)
+  -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
+  -- batch we can (at the beginning of training we will not have enough experience to fill a batch).
+  local memoryLength = #memory
+  local chosenBatchSize = math.min(batchSize, memoryLength)
+
+  local inputs = torch.zeros(chosenBatchSize, 1, gridSize, gridSize)
+  local targets = torch.zeros(chosenBatchSize, nbActions)
+
+  --Fill the inputs and targets up.
+  for i = 1, chosenBatchSize do
+    -- Choose a random memory experience to add to the batch.
+    local randomIndex = math.random(1, memoryLength)
+    local memoryInput = memory[randomIndex]
+    local target = model:forward(memoryInput.state)
+
+    --Gives us Q_sa, the max q for the next state.
+    local nextStateMaxQ = torch.max(model:forward(memoryInput.nextState), 1)[1]
+    if (memoryInput.gameOver) then
+        target[memoryInput.action] = memoryInput.reward
+    else
+        -- reward + discount(gamma) * max_a' Q(s',a')
+        -- We are setting the Q-value for the action to  r + γmax a’ Q(s’, a’). The rest stay the same
+        -- to give an error of 0 for those outputs.
+        target[memoryInput.action] = memoryInput.reward + opt.gamma * nextStateMaxQ
+    end
+    -- Update the inputs and targets.
+    inputs[i] = memoryInput.state
+    targets[i] = target
+  end
+  return inputs, targets
+end
+
+
+-- training function:
+local function trainNetwork(model, inputs, targets, criterion, sgdParams)
+    local loss = 0
+    local w, dE_dw = model:getParameters()
+    local function eval_E(w)
+        dE_dw:zero()
+        local predictions = model:forward(inputs)
+        local loss = criterion:forward(predictions, targets)
+        model:zeroGradParameters()
+        local gradOutput = criterion:backward(predictions, targets)
+        model:backward(inputs, gradOutput)
+        return loss, dE_dw
+    end
+
+    local _, fs = optim.adam(eval_E, w, optimState)
+    loss = loss + fs[1]
+    return loss
+end
 
 
 print("Started training...")
-while step < opt.steps do
-  step = step + 1
+-- local w, dE_dw = model:getParameters()
+-- local logger = optim.Logger('gradient.log')
+-- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
+-- logger:style{'-', '-', '-', '-'}
+for game = 1, opt.epochs do
   sys.tic()
+  -- Initialize the environment
+  local err = 0
+  local isGameOver = false
 
-  -- learning function for training our neural net:
-  local eval_E = function(w)
-    dE_dw:zero()
-    local f = criterion:forward(output, target)
-    local dE_dy = criterion:backward(output, target)
-    -- print(dE_dy[1]:view(1,-1), target)
-    -- logger:add(torch.totable(dE_dy)[1])
-    -- logger:plot()
-    model:backward(input, dE_dy)
-    return f, dE_dw -- return f and df/dX
-  end
+  local state = gameEnv:start()
 
-  -- we compute new actions only every few frames
-  if step == 1 or step % opt.sFrames == 0 then
+  while (isGameOver ~= true) do
+    local action
+    -- we compute new actions only every few frames
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,24,24}
-    state[(step/opt.sFrames)%opt.sFrames+1] = screen -- scale screen, average color planes
-    if opt.useGPU then state = state:cuda() end
-    outNet = model:forward(state)
-
+    -- if opt.useGPU then state = state:cuda() end
+  
     -- at random chose random action or action from neural net: best action from Q(state,a)
     if torch.uniform() < epsilon then
-      actionIdx = torch.random(#gameActions) -- random action
+      action = torch.random(#gameActions) -- random action
     else
-      value, actionIdx = outNet:max(1) -- select max output
-      actionIdx = actionIdx[1] -- select action from neural net
-      aHist[actionIdx] = aHist[actionIdx]+1
+      local q = model:forward(state)
+      local max, index = q:max(1) -- select max output
+      action = index[1] -- select action from neural net
+      aHist[action] = aHist[action]+1
     end
-  end
 
-  -- repeat the move >>> every step <<< (while learning happens only every opt.QLearnFreq)
-  if not terminal then
-    reward, screen, terminal = gameEnv:step(gameActions[actionIdx])
-  else
-    screen = gameEnv:start()
-    terminal = false
-  end
-  reward = math.clamp(reward, -1, 1) -- clamp reward to keep neural net from exploding
+    -- make the next move:
+    reward, nextState, terminal = gameEnv:step(gameActions[action])
+    reward = math.clamp(reward, -1, 1) -- clamp reward to keep neural net from exploding
 
-  -- count rewards:
-  if reward ~= 0 then
-    nRewards = nRewards + 1
-    totalReward = totalReward + reward
-  end
+    -- count rewards:
+    if reward ~= 0 then
+      nRewards = nRewards + 1
+      totalReward = totalReward + reward
+    end
 
-  -- compute action in newState and save to Experience Replay memory:
-  if step > 1 and step % opt.sFrames == 0 then
+    -- compute action in newState and save to Experience Replay memory:
     -- game screen size = {1,24,24}
-    newState[(step/opt.sFrames)%opt.sFrames+1] = screen -- scale screen, average color planes
-    if opt.useGPU then state = state:cuda() end
-    if opt.useGPU then newState = newState:cuda() end
+    -- if opt.useGPU then newState = newState:cuda() end
 
     -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
-    buffer[bufStep%opt.ERBufSize] = { state=state:clone():float(), action=actionIdx, reward=reward, 
-                                      newState=newState:clone():float(), terminal=terminal }
-    -- note 1: this rolling buffer places something in [0] which will not be used later... something to fix at some point...
-    -- note 2: find a better way to store episode: store only important episode
-    bufStep = bufStep + 1
-  end
+    table.insert( ERmemory, { state=state:clone():float(), action=action, reward=reward, 
+                              nextState=nextState:clone():float(), terminal=terminal } )
 
-  -- Q-learning in batch mode every few steps:
-  if bufStep > opt.batchSize then -- we shoudl not start training until we have filled the buffer
-    -- create next training batch:
-    local ri = torch.randperm(#buffer)
-    for i = 1, opt.batchSize do
-      -- print('indices:', i, ri[i])
-      input[i] = opt.useGPU and buffer[ri[i]].state:cuda() or buffer[ri[i]].state
-      newinput[i] = opt.useGPU and buffer[ri[i]].newState:cuda() or buffer[ri[i]].newState
-    end
-    newOutput = model:forward(newinput):clone() -- get output at 'newState' (clone to avoid losing it next model forward!)
-    output = model:forward(input) -- get output at state for backprop
-    -- print(output)
-    -- here we modify the target vector with Q updates:
-    local val, update
-    for i=1,opt.batchSize do
-      target[i] = output[i] -- get target vector at 'state'
-      -- print('target:', target[i]:view(1,-1))
-      -- update from newState:
-      if buffer[ri[i]].terminal then
-        update = buffer[ri[i]].reward
-      else
-        val = newOutput[i]:max() -- computed at 'newState'
-        update = buffer[ri[i]].reward + gamma * val
-      end
-      update = math.clamp(update, -1, 1) -- clamp update to keep neural net from exploding
-      target[i][buffer[ri[i]].action] = update -- target is previous output updated with reward
-      -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
-      -- print('action', buffer[ri[i]].action, '\n\n\n')
-    end
-    if opt.useGPU then target = target:cuda() end
+    -- Update the current state and if the game is over:
+    nextState = state
+    isGameOver = terminal
+
+    -- Q-learning in batch mode:
+      -- create next training batch:
+      -- local ri = torch.randperm(#ERmemory)
+      -- for i = 1, opt.batchSize do
+      --   -- print('indices:', i, ri[i])
+      --   input[i] = opt.useGPU and ERmemory[ri[i]].state:cuda() or ERmemory[ri[i]].state
+      --   nextInput[i] = opt.useGPU and ERmemory[ri[i]].nextState:cuda() or ERmemory[ri[i]].nextState
+      -- end
+      -- nextOutput = model:forward(nextInput):clone() -- get output at 'newState' (clone to avoid losing it next model forward!)
+      -- output = model:forward(input) -- get output at state for backprop
+      -- -- print(output)
+      -- -- here we modify the target vector with Q updates:
+      -- local val, update
+      -- for i=1,opt.batchSize do
+      --   target[i] = output[i] -- get target vector at 'state'
+      --   -- print('target:', target[i]:view(1,-1))
+      --   -- update from newState:
+      --   if ERmemory[ri[i]].terminal then
+      --     update = ERmemory[ri[i]].reward
+      --   else
+      --     val = newOutput[i]:max() -- computed at 'newState'
+      --     update = ERmemory[ri[i]].reward + opt.gamma * val
+      --   end
+      --   update = math.clamp(update, -1, 1) -- clamp update to keep neural net from exploding
+      --   target[i][ERmemory[ri[i]].action] = update -- target is previous output updated with reward
+      --   -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
+      --   -- print('action', buffer[ri[i]].action, '\n\n\n')
+      -- end
+      -- if opt.useGPU then target = target:cuda() end
+
+    -- get a batch of training data to train the model:
+    local inputs, targets = getBatch(ERmemory, model, opt.batchSize, #gameActions, opt.imSize)
 
     -- then train neural net:
-    _,fs = optim.rmsprop(eval_E, w, optimState)
-    err = err + fs[1]
+    err = err + trainNetwork(model, inputs, targets, criterion, optimState)
+  
+
+    if opt.display then win = image.display({image=state, win=win, zoom=opt.zoom, title='Train'}) end
+
   end
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.1 then epsilon = epsilon - (1/opt.steps) end
+  if epsilon > 0.1 then epsilon = epsilon - (1/opt.epochs) end
 
   -- display screen and print results:
-  if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom, title='Train'}) end
-  if step % opt.progFreq == 0 then
-    print('==> iteration = ' .. step ..
-      ', number rewards ' .. nRewards .. ', total reward ' .. totalReward ..
-      string.format(', average loss = %f', err) ..
-      string.format(', epsilon %.2f', epsilon) .. ', lr '..opt.learningRate .. 
-      string.format(', step time %.2f [ms]', sys.toc()*1000)
+  if game % opt.progFreq == 0 then
+    print('==> Game number: ' .. game ..
+      ', number rewards ' .. nRewards .. ', total reward: ' .. totalReward ..
+      string.format(', average loss: %f', err) ..
+      string.format(', epsilon: %.2f', epsilon) .. ', lr: '..opt.learningRate .. 
+      string.format(', step time: %.2f [ms]', sys.toc()*1000)
     )
     print('Action histogram:', aHist:view(1,#gameActions))
     aHist:zero()
     err = 0 -- reset after reporting period
   end
   
-
   -- save results if needed:
-  if step % opt.saveFreq == 0 then
+  if game % opt.saveFreq == 0 then
     torch.save( opt.savedir .. '/catch_model' .. step .. ".net", model:clone():clearState():float() )
   end
 
-  if step%1000 == 0 then collectgarbage() end
+  if game%1000 == 0 then collectgarbage() end
 end
 print('Finished training!')

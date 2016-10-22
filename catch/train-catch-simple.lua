@@ -114,7 +114,7 @@ local stateSpec = gameEnv:getStateSpec()
 local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
 print('screen size is:', observation:size())
--- print(stateSpec,actionSpec)
+print({stateSpec}, {actionSpec})
 gameActions = {0,1,2} -- game actions from CATCH
 -- print(gameActions, #gameActions)
 
@@ -193,9 +193,9 @@ end
 
 
 -- training function:
+local x, gradParameters = model:getParameters()
 local function trainNetwork(model, inputs, targets, criterion, sgdParams)
     local loss = 0
-    local x, gradParameters = model:getParameters()
     local function feval(x_new)
         gradParameters:zero()
         local predictions = model:forward(inputs)
@@ -230,50 +230,50 @@ local winCount = 0
 
 for i = 1, opt.epochs do
   sys.tic()
-    -- Initialize the environment
-    local err = 0
-    local isGameOver = false
+  -- Initialize the environment
+  local err = 0
+  local isGameOver = false
 
-    -- The initial state of the environment
-    local currentState = gameEnv:start()
+  -- The initial state of the environment
+  local currentState = gameEnv:start()
 
-    while (isGameOver ~= true) do
-        local action
-        -- random action or an action from the policy network:
-        if math.random() < epsilon then
-            action = math.random(1, #gameActions)
-        else
-            -- Forward the current state through the network:
-            local q = model:forward(currentState)
-            -- Find the max index (the chosen action):
-            local max, index = torch.max(q, 1)
-            action = index[1]
-        end
-      
-        local reward, nextState, gameOver = gameEnv:step(action)
-        if (reward == 1) then winCount = winCount + 1 end
-        memory.remember({
-            inputState = currentState,
-            action = action,
-            reward = reward,
-            nextState = nextState,
-            gameOver = gameOver
-        })
-        -- Update the current state and if the game is over:
-        currentState = nextState
-        isGameOver = gameOver
+  while (isGameOver ~= true) do
+      local action
+      -- random action or an action from the policy network:
+      if math.random() < epsilon then
+          action = math.random(1, #gameActions)
+      else
+          -- Forward the current state through the network:
+          local q = model:forward(currentState)
+          -- Find the max index (the chosen action):
+          local max, index = torch.max(q, 1)
+          action = index[1]
+      end
 
-        -- We get a batch of training data to train the model:
-        local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
+      local reward, nextState, gameOver = gameEnv:step(gameActions[action])
+      if (reward == 1) then winCount = winCount + 1 end
+      memory.remember({
+          inputState = currentState,
+          action = action,
+          reward = reward,
+          nextState = nextState,
+          gameOver = gameOver
+      })
+      -- Update the current state and if the game is over:
+      currentState = nextState
+      isGameOver = gameOver
 
-        -- Train the network, get error:
-        err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+      -- We get a batch of training data to train the model:
+      local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
 
-        -- display:
-        win = image.display({image=currentState, zoom=10, win=win, title='Train'})
-    end
-    if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-1/opt.epochs) end -- epsilon update
-    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
+      -- Train the network, get error:
+      err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+
+      -- display:
+      win = image.display({image=currentState, zoom=10, win=win, title='Train'})
+  end
+  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-1/opt.epochs) end -- epsilon update
+  print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
 end
 
 torch.save("catch-model.net", model)
