@@ -5,6 +5,8 @@
 -- playing CATCH version:
 -- https://github.com/Kaixhin/rlenvs
 
+-- DEAD simple version: get ball X,Y paddle X positions and train simple net 
+
 
 local image = require 'image'
 local Catch = require 'rlenvs/Catch' -- install: https://github.com/Kaixhin/rlenvs
@@ -19,21 +21,21 @@ lapp = require 'pl.lapp'
 opt = lapp [[
   
   Game options:
-  --gamma               (default 0.99)        discount factor in learning
+  --gamma               (default 0.9)         discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
   
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
-  -r,--learningRate       (default 0.001)     learning rate
-  -d,--learningRateDecay  (default 0)         learning rate decay
+  -r,--learningRate       (default 0.1)       learning rate
+  -d,--learningRateDecay  (default 1e-9)      learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --gridSize              (default 24)        state is screen resized to this size 
-  --batchSize             (default 32)        batch size for training
+  --gridSize              (default 10)        state is screen resized to this size 
+  --batchSize             (default 64)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --epochs                (default 1e4)       number of training steps to perform
+  --epochs                (default 5e3)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
@@ -69,14 +71,14 @@ local function Memory(maxMemory, discount)
         end
     end
 
-    function memory.getBatch(model, batchSize, nbActions, gridSize)
+    function memory.getBatch(model, batchSize, nbActions, dataSize)
 
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch).
         local memoryLength = #memory
         local chosenBatchSize = math.min(batchSize, memoryLength)
 
-        local inputs = torch.zeros(chosenBatchSize, 1, gridSize, gridSize)
+        local inputs = torch.zeros(chosenBatchSize, dataSize)
         local targets = torch.zeros(chosenBatchSize, nbActions)
 
         --Fill the inputs and targets up.
@@ -109,7 +111,7 @@ end
 
 --- General setup:
 -- local gameEnv, gameActions, agent, opt = setup(opt)
-local gameEnv = Catch({size = opt.gridSize, level = 2})
+local gameEnv = Catch({size = opt.gridSize, level = 1})
 local stateSpec = gameEnv:getStateSpec()
 local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
@@ -135,38 +137,10 @@ local nRewards = 0
 
 -- get model:
 local model
-if opt.largeModel then
   model = nn.Sequential()
-  -- layer 1
-  model:add(nn.SpatialConvolution(1,32,3,3,1,1))
+  model:add(nn.Linear(3*opt.gridSize-1, 64))
   model:add(nn.ReLU())
-  mdel:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- layer 2
-  model:add(nn.SpatialConvolution(32,64,3,3,1,1))
-  model:add(nn.ReLU())
-  model:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- layer 3
-  model:add(nn.SpatialConvolution(64,64,3,3,1,1))
-  model:add(nn.ReLU())
-  model:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- classifier
-  model:add(nn.View(64))
-  model:add(nn.Linear(64, 32))
-  model:add(nn.ReLU())
-  model:add(nn.Linear(32, #gameActions))
-else
-  model = nn.Sequential()
-  -- layer 1
-  model:add(nn.SpatialConvolution(1,8,5,5,2,2))
-  model:add(nn.ReLU())
-  model:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- layer 2
-  model:add(nn.SpatialConvolution(8,16,5,5,1,1))
-  model:add(nn.ReLU())
-  -- classifier
-  model:add(nn.View(16))
-  model:add(nn.Linear(16, #gameActions))
-end
+  model:add(nn.Linear(64, #gameActions))
 local criterion = nn.MSECriterion() 
 
 -- test:
@@ -189,9 +163,9 @@ end
 
 
 -- training function:
-local x, gradParameters = model:getParameters()
 local function trainNetwork(model, inputs, targets, criterion, sgdParams)
     local loss = 0
+    local x, gradParameters = model:getParameters()
     local function feval(x_new)
         gradParameters:zero()
         local predictions = model:forward(inputs)
@@ -218,9 +192,24 @@ local sgdParams = {
 }
 
 
+local function getSimpleState(inState)
+  local val, ballx, bally, paddlex1
+  -- print(inState)
+  bally = inState[{{},{1,opt.gridSize-1},{}}]:max(2):squeeze()
+  ballx = inState[{{},{1,opt.gridSize-1},{}}]:max(3):squeeze()
+  paddlex1 = inState[{{},{opt.gridSize},{}}]:max(2):squeeze()
+  -- print(ballx, bally, paddlex1)
+  local out = torch.cat(ballx, bally)
+  out = torch.cat(out, paddlex1)
+  -- print(out)
+  -- io.read()
+  return out
+end
+
+
 local memory = Memory(maxMemory, discount)
 local epsilon = opt.epsilon
-local epsilonMinimumValue = 0.05
+local epsilonMinimumValue = 0.001
 local win
 local winCount = 0
 
@@ -231,7 +220,8 @@ for i = 1, opt.epochs do
   local isGameOver = false
 
   -- The initial state of the environment
-  local currentState = gameEnv:start()
+  local screen = gameEnv:start()
+  currentState = getSimpleState(screen)
 
   while (isGameOver ~= true) do
       local action
@@ -246,7 +236,8 @@ for i = 1, opt.epochs do
           action = index[1]
       end
 
-      local reward, nextState, gameOver = gameEnv:step(gameActions[action])
+      local reward, screen, gameOver = gameEnv:step(gameActions[action])
+      nextState = getSimpleState(screen)
       if (reward == 1) then winCount = winCount + 1 end
       memory.remember({
           inputState = currentState,
@@ -260,13 +251,13 @@ for i = 1, opt.epochs do
       isGameOver = gameOver
 
       -- get a batch of training data to train the model:
-      local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
+      local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, 3*opt.gridSize-1)
 
       -- Train the network, get error:
       err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
 
       -- display:
-      win = image.display({image=currentState, zoom=10, win=win, title='Train'})
+      win = image.display({image=screen, zoom=10, win=win, title='Train'})
   end
   if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-2/opt.epochs) end -- epsilon update
   print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))

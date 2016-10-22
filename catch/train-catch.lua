@@ -43,7 +43,7 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --imSize                (default 24)        state is screen resized to this size 
+  --gridSize              (default 24)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
   --ERBufSize             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 1)         input frames to stack as input / learn every update_freq steps of game
@@ -74,7 +74,7 @@ function math.clamp(n, low, high) return math.min(math.max(low, n), high) end
 
 --- General setup:
 -- local gameEnv, gameActions, agent, opt = setup(opt)
-local gameEnv = Catch({level = 2})
+local gameEnv = Catch({size = opt.gridSize, level = 2})
 local stateSpec = gameEnv:getStateSpec()
 local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
