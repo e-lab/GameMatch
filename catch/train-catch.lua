@@ -8,9 +8,6 @@
 -- playing CATCH version:
 -- https://github.com/Kaixhin/rlenvs
 
--- if not dqn then
-    -- require "initenv"
--- end
 
 local image = require 'image'
 local Catch = require 'rlenvs/Catch' -- install: https://github.com/Kaixhin/rlenvs
@@ -152,11 +149,9 @@ local nRewards = 0
 local win = nil
 local aHist = torch.zeros(#gameActions)
 local ERmemory = {} -- Experience Replay memory
-local state = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
-local nextState = torch.zeros(opt.sFrames, opt.imSize, opt.imSize)
--- input = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
--- if opt.useGPU then input = input:cuda() end
-local nextInput = torch.zeros(opt.batchSize, opt.sFrames, opt.imSize, opt.imSize)
+local state = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+local nextInput = torch.zeros(opt.batchSize, opt.sFrames, opt.gridSize, opt.gridSize)
 -- if opt.useGPU then newinput = newinput:cuda() end
 local target = torch.zeros(opt.batchSize, #gameActions)
 -- if opt.useGPU then target = target:cuda() end
@@ -271,38 +266,8 @@ for game = 1, opt.epochs do
     nextState = state
     GameOver = terminal
 
-    -- Q-learning in batch mode:
-      -- create next training batch:
-      -- local ri = torch.randperm(#ERmemory)
-      -- for i = 1, opt.batchSize do
-      --   -- print('indices:', i, ri[i])
-      --   input[i] = opt.useGPU and ERmemory[ri[i]].state:cuda() or ERmemory[ri[i]].state
-      --   nextInput[i] = opt.useGPU and ERmemory[ri[i]].nextState:cuda() or ERmemory[ri[i]].nextState
-      -- end
-      -- nextOutput = model:forward(nextInput):clone() -- get output at 'newState' (clone to avoid losing it next model forward!)
-      -- output = model:forward(input) -- get output at state for backprop
-      -- -- print(output)
-      -- -- here we modify the target vector with Q updates:
-      -- local val, update
-      -- for i=1,opt.batchSize do
-      --   target[i] = output[i] -- get target vector at 'state'
-      --   -- print('target:', target[i]:view(1,-1))
-      --   -- update from newState:
-      --   if ERmemory[ri[i]].terminal then
-      --     update = ERmemory[ri[i]].reward
-      --   else
-      --     val = newOutput[i]:max() -- computed at 'newState'
-      --     update = ERmemory[ri[i]].reward + opt.gamma * val
-      --   end
-      --   update = math.clamp(update, -1, 1) -- clamp update to keep neural net from exploding
-      --   target[i][ERmemory[ri[i]].action] = update -- target is previous output updated with reward
-      --   -- print('new target:', target[i]:view(1,-1), 'update', target[i][buffer[ri[i]].action])
-      --   -- print('action', buffer[ri[i]].action, '\n\n\n')
-      -- end
-      -- if opt.useGPU then target = target:cuda() end
-
     -- get a batch of training data to train the model:
-    local inputs, targets = getBatch(ERmemory, model, opt.batchSize, #gameActions, opt.imSize)
+    local inputs, targets = getBatch(ERmemory, model, opt.batchSize, #gameActions, opt.gridSize)
 
     -- then train neural net:
     err = err + trainNetwork(model, inputs, targets, criterion, optimState)
