@@ -276,7 +276,7 @@ for i = 1, opt.epochs do
         err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
 
         -- display:
-        win = image.display({image=currentState, zoom=10, win=win})
+        win = image.display({image=currentState, zoom=10, win=win, title='Train'})
     end
     print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
 end
