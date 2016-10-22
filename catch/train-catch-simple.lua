@@ -221,16 +221,13 @@ local sgdParams = {
     nesterov = true
 }
 
--- Mean Squared Error for our loss function.
-local criterion = nn.MSECriterion()
 
--- local env = --CatchEnvironment(gridSize)
 local memory = Memory(maxMemory, discount)
 local epsilon = opt.epsilon
 local epsilonMinimumValue = 0.05
-
 local win
 local winCount = 0
+
 for i = 1, opt.epochs do
   sys.tic()
     -- Initialize the environment
@@ -252,10 +249,7 @@ for i = 1, opt.epochs do
             local max, index = torch.max(q, 1)
             action = index[1]
         end
-        -- Decay epsilon
-        if (epsilon > epsilonMinimumValue) then
-            epsilon = opt.epsilon * (1- 1/(opt.batchSize * opt.epochs))
-        end
+      
         local reward, nextState, gameOver = gameEnv:step(action)
         if (reward == 1) then winCount = winCount + 1 end
         memory.remember({
@@ -278,6 +272,7 @@ for i = 1, opt.epochs do
         -- display:
         win = image.display({image=currentState, zoom=10, win=win, title='Train'})
     end
+    if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-1/opt.epochs) end -- epsilon update
     print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
 end
 
