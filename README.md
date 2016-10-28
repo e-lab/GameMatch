@@ -13,7 +13,8 @@ Directories:
 
 ## installation
 
-requires xitari and alewrap 
+requires [xitari](https://github.com/deepmind/xitari.git) and [alewrap](https://github.com/deepmind/alewrap.git
+)
 
 ## training a new RL model
 
@@ -21,7 +22,7 @@ requires xitari and alewrap
 
 `qlua train.lua --display --useGPU` to display output game locally on GPU.
 
-`th train.lua --useGPU` to train on remote server with no display on GPU. 
+`th train.lua --useGPU` to train on remote server with no display on GPU.
 
 Inspired by: https://github.com/kuz/DeepMind-Atari-Deep-Q-Learner
 
