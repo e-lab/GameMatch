@@ -212,8 +212,9 @@ local epsilon = opt.epsilon
 local epsilonMinimumValue = 0.001
 local win
 local winCount = 0
+local totalCount = 0
 
-for i = 1, opt.epochs do
+for game = 1, opt.epochs do
   sys.tic()
   -- Initialize the environment
   local err = 0
@@ -257,10 +258,14 @@ for i = 1, opt.epochs do
       err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
 
       -- display:
-      win = image.display({image=screen, zoom=10, win=win, title='Train'})
+      if opt.display then win = image.display({image=screen, zoom=10, win=win, title='Train'}) end
   end
-  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-1.5/opt.epochs) end -- epsilon update
-  print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
+  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-3/opt.epochs) end -- epsilon update
+  if game%opt.progFreq==0 then 
+    totalCount = totalCount + winCount
+    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, Total win count: %d, time %.2f", game, err, epsilon, winCount, totalCount, sys.toc()))
+    winCount = 0
+  end
 end
 
 torch.save("catch-model-dead-simple.net", model)

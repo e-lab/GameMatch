@@ -86,36 +86,39 @@ local reward, screen, terminal = gameEnv:step()
 -- get model:
 local model
 if opt.largeModel then
-  model = nn.Sequential()
-  -- layer 1
-  model:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
-  model:add(nn.ReLU())
-  mdel:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- layer 2
-  model:add(nn.SpatialConvolution(32,64,3,3,1,1))
-  model:add(nn.ReLU())
-  model:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- layer 3
-  model:add(nn.SpatialConvolution(64,64,3,3,1,1))
-  model:add(nn.ReLU())
-  model:add(nn.SpatialMaxPooling(2,2,2,2))
-  -- classifier
-  model:add(nn.View(64))
-  model:add(nn.Linear(64, 32))
-  model:add(nn.ReLU())
-  model:add(nn.Linear(32, #gameActions))
+  -- model = nn.Sequential()
+  -- -- layer 1
+  -- model:add(nn.SpatialConvolution(opt.sFrames,32,3,3,1,1))
+  -- model:add(nn.ReLU())
+  -- mdel:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- -- layer 2
+  -- model:add(nn.SpatialConvolution(32,64,3,3,1,1))
+  -- model:add(nn.ReLU())
+  -- model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- -- layer 3
+  -- model:add(nn.SpatialConvolution(64,64,3,3,1,1))
+  -- model:add(nn.ReLU())
+  -- model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- -- classifier
+  -- model:add(nn.View(64))
+  -- model:add(nn.Linear(64, 32))
+  -- model:add(nn.ReLU())
+  -- model:add(nn.Linear(32, #gameActions))
 else
   model = nn.Sequential()
   -- layer 1
-  model:add(nn.SpatialConvolution(opt.sFrames,8,5,5,2,2))
+  -- model:add(nn.SpatialConvolution(opt.sFrames,8,5,5,2,2))
   -- model:add(nn.ReLU())
-  model:add(nn.SpatialMaxPooling(2,2,2,2))
+  -- model:add(nn.SpatialMaxPooling(2,2,2,2))
   -- layer 2
-  model:add(nn.SpatialConvolution(8,16,5,5,1,1))
+  -- model:add(nn.SpatialConvolution(8,16,5,5,2,2))
   -- model:add(nn.ReLU())
   -- classifier
-  model:add(nn.View(16))
-  model:add(nn.Linear(16, #gameActions))
+
+  model:add(nn.View(400))
+  model:add(nn.Linear(400, 128))
+  model:add(nn.ReLU())
+  model:add(nn.Linear(128, #gameActions))
 end
 local criterion = nn.MSECriterion() 
 
@@ -226,7 +229,7 @@ for game = 1, opt.epochs do
   local GameOver = false
 
   local screen = gameEnv:start()
-  state[1] = screen
+  state[opt.sFrames] = screen
 
   while not GameOver do
     local action
@@ -234,7 +237,7 @@ for game = 1, opt.epochs do
     -- We are in state S, now use model to get next action:
     -- game screen size = {1,24,24}
     -- if opt.useGPU then state = state:cuda() end
-  
+ 
     -- at random chose random action or action from neural net: best action from Q(state,a)
     if torch.uniform() < epsilon then
       action = torch.random(#gameActions) -- random action
@@ -281,7 +284,7 @@ for game = 1, opt.epochs do
   end
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.05 then epsilon = epsilon*(1-1.5/opt.epochs) end
+  if epsilon > 0.05 then epsilon = epsilon*(1-2/opt.epochs) end
 
   -- display screen and print results:
   if game % opt.progFreq == 0 then
