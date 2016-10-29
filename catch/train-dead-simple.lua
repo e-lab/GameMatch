@@ -259,7 +259,7 @@ for i = 1, opt.epochs do
       -- display:
       win = image.display({image=screen, zoom=10, win=win, title='Train'})
   end
-  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-2/opt.epochs) end -- epsilon update
+  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-1.5/opt.epochs) end -- epsilon update
   print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, time %.2f", i, err, epsilon, winCount, sys.toc()))
 end
 

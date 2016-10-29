@@ -281,7 +281,7 @@ for game = 1, opt.epochs do
   end
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.05 then epsilon = epsilon*(1-1/opt.epochs) end
+  if epsilon > 0.05 then epsilon = epsilon*(1-1.5/opt.epochs) end
 
   -- display screen and print results:
   if game % opt.progFreq == 0 then
