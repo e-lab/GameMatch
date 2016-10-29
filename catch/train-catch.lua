@@ -43,7 +43,7 @@ opt = lapp [[
   --gridSize              (default 24)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
   --ERBufSize             (default 1e3)       Experience Replay buffer memory
-  --sFrames               (default 1)         input frames to stack as input / learn every update_freq steps of game
+  --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
   --epochs                (default 1e4)       number of training games to play
   --progFreq              (default 1e2)       frequency of progress output
   --useGPU                                    use GPU in training
@@ -108,11 +108,11 @@ else
   model = nn.Sequential()
   -- layer 1
   model:add(nn.SpatialConvolution(opt.sFrames,8,5,5,2,2))
-  model:add(nn.ReLU())
+  -- model:add(nn.ReLU())
   model:add(nn.SpatialMaxPooling(2,2,2,2))
   -- layer 2
   model:add(nn.SpatialConvolution(8,16,5,5,1,1))
-  model:add(nn.ReLU())
+  -- model:add(nn.ReLU())
   -- classifier
   model:add(nn.View(16))
   model:add(nn.Linear(16, #gameActions))
@@ -164,7 +164,7 @@ function getBatch(memory, model, batchSize, nbActions, gridSize)
   local memoryLength = #memory
   local chosenBatchSize = math.min(batchSize, memoryLength)
 
-  local inputs = torch.zeros(chosenBatchSize, 1, gridSize, gridSize)
+  local inputs = torch.zeros(chosenBatchSize, opt.sFrames, gridSize, gridSize)
   local targets = torch.zeros(chosenBatchSize, nbActions)
 
   --Fill the inputs and targets up.
@@ -225,7 +225,7 @@ for game = 1, opt.epochs do
   local err = 0
   local GameOver = false
 
-  local state = gameEnv:start()
+  state[1] = gameEnv:start()
 
   while not GameOver do
     local action
@@ -245,7 +245,10 @@ for game = 1, opt.epochs do
     end
 
     -- make the next move:
-    reward, nextState, terminal = gameEnv:step(gameActions[action])
+    reward, screen, terminal = gameEnv:step(gameActions[action])
+    for i=1,opt.sFrames-1 do nextState[i] = nextState[i+1] end -- prepare last opt.sFrames frames in sequence
+    nextState[opt.sFrames] = screen
+
     reward = math.clamp(reward, -1, 1) -- clamp reward to keep neural net from exploding
 
     -- count rewards:
