@@ -225,7 +225,8 @@ for game = 1, opt.epochs do
   local err = 0
   local GameOver = false
 
-  state[1] = gameEnv:start()
+  local screen = gameEnv:start()
+  state[1] = screen
 
   while not GameOver do
     local action
