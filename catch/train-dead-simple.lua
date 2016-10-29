@@ -253,7 +253,7 @@ for game = 1, opt.epochs do
   if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-3/opt.epochs) end -- epsilon update
   if game%opt.progFreq==0 then 
     totalCount = totalCount + winCount
-    print(string.format("Epoch: %d, err: %f, epsilon: %f, Accuracy: %.2f, Win count: %d, Total win count: %d, time %.2f", game, err, epsilon, winCount/opt.progFreq, winCount, totalCount, sys.toc()))
+    print(string.format("Epoch: %d, err: %.3f, epsilon: %.2f, Accuracy: %.2f, Win count: %d, Total win count: %d, time %.3f", game, err, epsilon, winCount/opt.progFreq, winCount, totalCount, sys.toc()))
     winCount = 0
   end
 end

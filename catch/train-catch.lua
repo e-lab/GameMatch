@@ -268,16 +268,11 @@ for game = 1, opt.epochs do
 
   -- display screen and print results:
   if game % opt.progFreq == 0 then
-    print('==> Game number: ' .. game .. ', Accuracy: '.. nRewards/opt.progFreq ..
-      ', number rewards ' .. nRewards .. ', total reward: ' .. totalReward ..
-      string.format(', average loss: %f', err) ..
-      string.format(', epsilon: %.2f', epsilon) .. ', lr: '..opt.learningRate .. 
-      string.format(', step time: %.2f [ms]', sys.toc()*1000)
-    )
+    totalCount = totalCount + winCount
+    print(string.format("Epoch: %d, err: %.3f, epsilon: %.2f, Accuracy: %.2f, Win count: %d, Total win count: %d, time %.3f", game, err, epsilon, winCount/opt.progFreq, winCount, totalCount, sys.toc()))
     -- print('Action histogram:', aHist:view(1,#gameActions))
     -- aHist:zero()
-    nRewards = 0 -- reset this time rewards
-    err = 0 -- reset after reporting period
+    winCount = 0 -- reset this time rewards
   end
   
   -- save results if needed:
