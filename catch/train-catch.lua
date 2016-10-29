@@ -40,9 +40,9 @@ opt = lapp [[
   -d,--learningRateDecay  (default 0)         learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --gridSize              (default 24)        state is screen resized to this size 
+  --gridSize              (default 10)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
-  --ERBufSize             (default 1e3)       Experience Replay buffer memory
+  --maxMemory             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
   --epochs                (default 1e4)       number of training games to play
   --progFreq              (default 1e2)       frequency of progress output
@@ -70,18 +70,14 @@ os.execute('mkdir '..opt.savedir)
 function math.clamp(n, low, high) return math.min(math.max(low, n), high) end
 
 --- General setup:
--- local gameEnv, gameActions, agent, opt = setup(opt)
-local gameEnv = Catch({size = opt.gridSize, level = 2})
+local gameEnv = Catch({size = opt.gridSize, level = 1})
 local stateSpec = gameEnv:getStateSpec()
 local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
 print('screen size is:', observation:size())
--- print(stateSpec,actionSpec)
+-- print({stateSpec}, {actionSpec})
 local gameActions = {0,1,2} -- game actions from CATCH
 -- print(gameActions, #gameActions)
-
--- start a new game, here screen == state
-local reward, screen, terminal = gameEnv:step()
 
 -- get model:
 local model
@@ -115,8 +111,8 @@ else
   -- model:add(nn.ReLU())
   -- classifier
 
-  model:add(nn.View(400))
-  model:add(nn.Linear(400, 128))
+  model:add(nn.View(opt.sFrames*opt.gridSize^2))
+  model:add(nn.Linear(opt.sFrames*opt.gridSize^2, 128))
   model:add(nn.ReLU())
   model:add(nn.Linear(128, #gameActions))
 end
@@ -135,29 +131,6 @@ if opt.useGPU then
   criterion:cuda()
   print('Using GPU number', opt.gpuId)
 end
-
--- set parameters and vars:
-local epsilon = opt.epsilon -- ϵ-greedy action selection
-
-local optimState = {
-  learningRate = opt.learningRate,
-  momentum = opt.momentum,
-  learningRateDecay = opt.learningRateDecay,
-  weightDecay = opt.weightDecay
-}
-local totalReward = 0
-local nRewards = 0
-
--- online training:
-local win = nil
-local aHist = torch.zeros(#gameActions)
-local ERmemory = {} -- Experience Replay memory
-local state = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
-local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
-local nextInput = torch.zeros(opt.batchSize, opt.sFrames, opt.gridSize, opt.gridSize)
--- if opt.useGPU then newinput = newinput:cuda() end
-local target = torch.zeros(opt.batchSize, #gameActions)
--- if opt.useGPU then target = target:cuda() end
 
 
 
@@ -179,7 +152,7 @@ function getBatch(memory, model, batchSize, nbActions, gridSize)
 
     --Gives us Q_sa, the max q for the next state.
     local nextStateMaxQ = torch.max(model:forward(memoryInput.nextState), 1)[1]
-    nextStateMaxQ = math.clamp(nextStateMaxQ, -1, 1) -- clamp updates to keep neural net from exploding
+    -- nextStateMaxQ = math.clamp(nextStateMaxQ, -1, 1) -- clamp updates to keep neural net from exploding
     if (memoryInput.gameOver) then
         target[memoryInput.action] = memoryInput.reward
     else
@@ -195,83 +168,90 @@ function getBatch(memory, model, batchSize, nbActions, gridSize)
   return inputs, targets
 end
 
-
 -- training function:
-local function trainNetwork(model, inputs, targets, criterion, sgdParams)
+local function trainNetwork(model, inputs, targets, criterion, trainParams)
     local loss = 0
-    local w, dE_dw = model:getParameters()
-    local function eval_E(w)
-        dE_dw:zero()
+    local x, gradParameters = model:getParameters()
+    local function feval(x_new)
+        gradParameters:zero()
         local predictions = model:forward(inputs)
         local loss = criterion:forward(predictions, targets)
         model:zeroGradParameters()
         local gradOutput = criterion:backward(predictions, targets)
         model:backward(inputs, gradOutput)
-        return loss, dE_dw
+        return loss, gradParameters
     end
 
-    local _, fs = optim.adam(eval_E, w, optimState)
+    local _, fs = optim.sgd(feval, x, trainParams)
     loss = loss + fs[1]
     return loss
 end
 
+local optimState = {
+    learningRate = opt.learningRate,
+    learningRateDecay = opt.learningRateDecay,
+    weightDecay = opt.weightDecay,
+    momentum = opt.momentum,
+    dampening = 0,
+    nesterov = true
+}
+
+
+-- online training:
+local aHist = torch.zeros(#gameActions)
+local ERmemory = {} -- Experience Replay memory
+local currentState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+local nextInput = torch.zeros(opt.batchSize, opt.sFrames, opt.gridSize, opt.gridSize)
+-- if opt.useGPU then newinput = newinput:cuda() end
+local target = torch.zeros(opt.batchSize, #gameActions)
+-- if opt.useGPU then target = target:cuda() end
+
+
+-- set parameters and vars:
+local epsilon = opt.epsilon -- ϵ-greedy action selection
+local epsilonMinimumValue = 0.005
+local win
+local winCount = 0
+local totalCount = 0
 
 print("Started training...")
--- local w, dE_dw = model:getParameters()
--- local logger = optim.Logger('gradient.log')
--- logger:setNames{'dE_dy1', 'dE_dy2', 'dE_dy3', 'dE_dy4'}
--- logger:style{'-', '-', '-', '-'}
 for game = 1, opt.epochs do
-  
   sys.tic()
   -- Initialize the environment
   local err = 0
-  local GameOver = false
+  local isGameOver = false
+  local screen, reward, gameOver, action
 
-  local screen = gameEnv:start()
-  state[opt.sFrames] = screen
+  screen = gameEnv:start()
+  currentState[opt.sFrames] = screen
 
-  while not GameOver do
-    local action
-    -- we compute new actions only every few frames
-    -- We are in state S, now use model to get next action:
-    -- game screen size = {1,24,24}
-    -- if opt.useGPU then state = state:cuda() end
- 
+  while not isGameOver do 
     -- at random chose random action or action from neural net: best action from Q(state,a)
     if torch.uniform() < epsilon then
       action = torch.random(#gameActions) -- random action
     else
-      local q = model:forward(state)
-      local max, index = q:max(1) -- select max output
+      local q = model:forward(currentState)
+      local max, index = torch.max(q, 1) -- select max output
       action = index[1] -- select action from neural net
       aHist[action] = aHist[action]+1
     end
 
     -- make the next move:
-    reward, screen, terminal = gameEnv:step(gameActions[action])
+    reward, screen, gameOver = gameEnv:step(gameActions[action])
     for i=1,opt.sFrames-1 do nextState[i] = nextState[i+1] end -- prepare last opt.sFrames frames in sequence
-    nextState[opt.sFrames] = screen
-
-    reward = math.clamp(reward, -1, 1) -- clamp reward to keep neural net from exploding
-
+    nextState[opt.sFrames] = screen:clone()
     -- count rewards:
-    if reward ~= 0 then
-      nRewards = nRewards + 1
-      totalReward = totalReward + reward
-    end
+    if (reward == 1) then winCount = winCount + 1 end
 
-    -- compute action in newState and save to Experience Replay memory:
-    -- game screen size = {1,24,24}
-    -- if opt.useGPU then newState = newState:cuda() end
-
-    -- Experience Replay: store episode in rolling buffer memory (system memory, not GPU mem!)
-    table.insert( ERmemory, { state=state:clone():float(), action=action, reward=reward, 
-                              nextState=nextState:clone():float(), terminal=terminal } )
+    -- store in experience replay memory and keep it to a max size;
+    table.insert( ERmemory, { state=currentState:clone():float(), action=action, reward=reward, 
+                              nextState=nextState:clone():float(), gameOver=gameOver } )
+    if (#ERmemory > opt.maxMemory) then table.remove(ERmemory, 1) end
 
     -- Update the current state and if the game is over:
-    nextState = state
-    GameOver = terminal
+    currentState = nextState
+    isGameOver = gameOver
 
     -- get a batch of training data to train the model:
     local inputs, targets = getBatch(ERmemory, model, opt.batchSize, #gameActions, opt.gridSize)
@@ -284,11 +264,11 @@ for game = 1, opt.epochs do
   end
 
   -- epsilon is updated every once in a while to do less random actions (and more neural net actions)
-  if epsilon > 0.05 then epsilon = epsilon*(1-2/opt.epochs) end
+  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-2/opt.epochs) end
 
   -- display screen and print results:
   if game % opt.progFreq == 0 then
-    print('==> Game number: ' .. game ..
+    print('==> Game number: ' .. game .. ', Accuracy: '.. nRewards/opt.progFreq ..
       ', number rewards ' .. nRewards .. ', total reward: ' .. totalReward ..
       string.format(', average loss: %f', err) ..
       string.format(', epsilon: %.2f', epsilon) .. ', lr: '..opt.learningRate .. 

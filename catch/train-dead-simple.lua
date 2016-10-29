@@ -123,14 +123,6 @@ local gameActions = {0,1,2} -- game actions from CATCH
 -- set parameters and vars:
 local epsilon = opt.epsilon -- ϵ-greedy action selection
 local gamma = opt.gamma -- discount factor
-local err = 0 -- loss function error (average over opt.progFreq steps)
-local w, dE_dw
-local optimState = {
-  learningRate = opt.learningRate,
-  momentum = opt.momentum,
-  learningRateDecay = opt.learningRateDecay,
-  weightDecay = opt.weightDecay
-}
 local totalReward = 0
 local nRewards = 0
 
@@ -138,18 +130,14 @@ local nRewards = 0
 -- get model:
 local model
   model = nn.Sequential()
-  model:add(nn.Linear(3*opt.gridSize-1, 64))
+  model:add(nn.Linear(3*opt.gridSize-1, 128))
   model:add(nn.ReLU())
-  model:add(nn.Linear(64, #gameActions))
+  model:add(nn.Linear(128, #gameActions))
 local criterion = nn.MSECriterion() 
-
 -- test:
 -- print(model:forward(torch.Tensor(4,24,24)))
-
 print('This is the model:', model)
-w, dE_dw = model:getParameters()
-print('Number of parameters ' .. w:nElement())
-print('Number of grads ' .. dE_dw:nElement())
+
 
 -- use GPU, if desired:
 if opt.useGPU then
@@ -239,7 +227,9 @@ for game = 1, opt.epochs do
 
       local reward, screen, gameOver = gameEnv:step(gameActions[action])
       nextState = getSimpleState(screen)
+      -- count rewards:
       if (reward == 1) then winCount = winCount + 1 end
+      -- add current play to experience replay memory
       memory.remember({
           inputState = currentState,
           action = action,
@@ -263,7 +253,7 @@ for game = 1, opt.epochs do
   if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-3/opt.epochs) end -- epsilon update
   if game%opt.progFreq==0 then 
     totalCount = totalCount + winCount
-    print(string.format("Epoch: %d, err: %f, epsilon: %f, Win count: %d, Total win count: %d, time %.2f", game, err, epsilon, winCount, totalCount, sys.toc()))
+    print(string.format("Epoch: %d, err: %f, epsilon: %f, Accuracy: %.2f, Win count: %d, Total win count: %d, time %.2f", game, err, epsilon, winCount/opt.progFreq, winCount, totalCount, sys.toc()))
     winCount = 0
   end
 end
