@@ -275,7 +275,7 @@ for game = 1, opt.epochs do
     -- then train neural net:
     err = err + trainNetwork(model, inputs, targets, criterion, optimState)
   
-    if opt.display then win = image.display({image=state, win=win, zoom=opt.zoom, title='Train'}) end
+    if opt.display then win = image.display({image=screen, win=win, zoom=opt.zoom, title='Train'}) end
 
   end
 
@@ -292,6 +292,7 @@ for game = 1, opt.epochs do
     )
     print('Action histogram:', aHist:view(1,#gameActions))
     aHist:zero()
+    nRewards = 0 -- reset this time rewards
     err = 0 -- reset after reporting period
   end
   
