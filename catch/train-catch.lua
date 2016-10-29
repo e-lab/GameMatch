@@ -198,7 +198,7 @@ local optimState = {
 
 
 -- online training:
-local aHist = torch.zeros(#gameActions)
+-- local aHist = torch.zeros(#gameActions)
 local ERmemory = {} -- Experience Replay memory
 local currentState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
 local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
@@ -234,7 +234,7 @@ for game = 1, opt.epochs do
       local q = model:forward(currentState)
       local max, index = torch.max(q, 1) -- select max output
       action = index[1] -- select action from neural net
-      aHist[action] = aHist[action]+1
+      -- aHist[action] = aHist[action]+1 -- histogram of action for debugging
     end
 
     -- make the next move:
@@ -274,8 +274,8 @@ for game = 1, opt.epochs do
       string.format(', epsilon: %.2f', epsilon) .. ', lr: '..opt.learningRate .. 
       string.format(', step time: %.2f [ms]', sys.toc()*1000)
     )
-    print('Action histogram:', aHist:view(1,#gameActions))
-    aHist:zero()
+    -- print('Action histogram:', aHist:view(1,#gameActions))
+    -- aHist:zero()
     nRewards = 0 -- reset this time rewards
     err = 0 -- reset after reporting period
   end
