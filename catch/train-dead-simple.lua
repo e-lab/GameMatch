@@ -116,7 +116,7 @@ local stateSpec = gameEnv:getStateSpec()
 local actionSpec = gameEnv:getActionSpec()
 local observation = gameEnv:start()
 print('screen size is:', observation:size())
-print({stateSpec}, {actionSpec})
+-- print({stateSpec}, {actionSpec})
 local gameActions = {0,1,2} -- game actions from CATCH
 -- print(gameActions, #gameActions)
 
@@ -135,7 +135,7 @@ local model
   model:add(nn.Linear(128, #gameActions))
 local criterion = nn.MSECriterion() 
 -- test:
--- print(model:forward(torch.Tensor(4,24,24)))
+-- print(model:forward(torch.Tensor(opt.sFrames,opt.gridSize,opt.gridSize)))
 print('This is the model:', model)
 
 
@@ -231,10 +231,10 @@ for game = 1, opt.epochs do
       if (reward == 1) then winCount = winCount + 1 end
       -- add current play to experience replay memory
       memory.remember({
-          inputState = currentState,
+          inputState = currentState:clone(),
           action = action,
           reward = reward,
-          nextState = nextState,
+          nextState = nextState:clone(),
           gameOver = gameOver
       })
       -- Update the current state and if the game is over:
