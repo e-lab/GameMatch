@@ -192,7 +192,7 @@ local function getSimpleState(inState)
 end
 
 
-local memory = Memory(maxMemory, discount)
+local memory = Memory(opt.maxMemory, discount)
 local epsilon = opt.epsilon
 local epsilonMinimumValue = 0.001
 local win
