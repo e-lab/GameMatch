@@ -189,13 +189,13 @@ local epsilonMinimumValue = 0.005
 local win
 local winCount = 0
 local totalCount = 0
+local currentState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+local screen, action, reward, gameOver
 
 for game = 1, opt.epochs do
   sys.tic()
   -- Initialize the environment
-  local currentState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
-  local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
-  local screen, action, reward, gameOver
   local err = 0
   local isGameOver = false
 

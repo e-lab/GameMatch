@@ -198,11 +198,11 @@ local epsilonMinimumValue = 0.001
 local win
 local winCount = 0
 local totalCount = 0
+local screen, action, currentState, nextState, reward, gameOver
 
 for game = 1, opt.epochs do
   sys.tic()
   -- Initialize the environment
-  local screen, action, currentState, nextState, reward, gameOver
   local err = 0
   local isGameOver = false
 
