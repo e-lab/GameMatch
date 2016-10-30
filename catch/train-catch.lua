@@ -59,7 +59,7 @@ function math.clamp(n, low, high) return math.min(math.max(low, n), high) end
 
 --[[ The memory: Handles the internal memory that we add experiences that occur based on agent's actions,
 --   and creates batches of experiences based on the mini-batch size for training.]] --
-local function Memory(maxMemory, discount)
+local function Memory(maxMemory)
     local memory = {}
 
     -- Appends the experience to the memory.
@@ -71,7 +71,7 @@ local function Memory(maxMemory, discount)
         end
     end
 
-    function memory.getBatch(model, batchSize, nbActions, gridSize)
+    function memory.getBatch(model, gamma, batchSize, nbActions, gridSize)
 
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch).
@@ -96,7 +96,7 @@ local function Memory(maxMemory, discount)
                 -- reward + discount(gamma) * max_a' Q(s',a')
                 -- We are setting the Q-value for the action to  r + γmax a’ Q(s’, a’). The rest stay the same
                 -- to give an error of 0 for those outputs.
-                target[memoryInput.action] = memoryInput.reward + opt.gamma * nextStateMaxQ
+                target[memoryInput.action] = memoryInput.reward + gamma * nextStateMaxQ
             end
             -- Update the inputs and targets.
             inputs[i] = memoryInput.inputState
@@ -183,7 +183,7 @@ local sgdParams = {
 }
 
 
-local memory = Memory(opt.maxMemory, discount)
+local memory = Memory(opt.maxMemory)
 local epsilon = opt.epsilon
 local epsilonMinimumValue = 0.005
 local win
@@ -236,7 +236,7 @@ for game = 1, opt.epochs do
       isGameOver = gameOver
 
       -- get a batch of training data to train the model:
-      local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
+      local inputs, targets = memory.getBatch(model, opt.gamma, opt.batchSize, #gameActions, opt.gridSize)
 
       -- Train the network, get error: (only train after replay emmeory has been filled)
       if game > opt.maxMemory then
