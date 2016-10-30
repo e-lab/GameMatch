@@ -199,8 +199,6 @@ end
 
 
 local memory = Memory(maxMemory, discount)
-local currentState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
-local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
 local epsilon = opt.epsilon
 local epsilonMinimumValue = 0.005
 local win
@@ -210,6 +208,8 @@ local totalCount = 0
 for game = 1, opt.epochs do
   sys.tic()
   -- Initialize the environment
+  local currentState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
+  local nextState = torch.zeros(opt.sFrames, opt.gridSize, opt.gridSize)
   local screen, action, reward, gameOver
   local err = 0
   local isGameOver = false
@@ -221,8 +221,8 @@ for game = 1, opt.epochs do
 
   while (isGameOver ~= true) do
       -- random action or an action from the policy network:
-      if math.random() < epsilon then
-          action = math.random(1, #gameActions)
+      if torch.random() < epsilon then
+          action = torch.random(#gameActions)
       else
           -- Forward the current state through the network:
           local q = model:forward(currentState)

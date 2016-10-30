@@ -215,8 +215,8 @@ for game = 1, opt.epochs do
 
   while (isGameOver ~= true) do
       -- random action or an action from the policy network:
-      if math.random() < epsilon then
-          action = math.random(1, #gameActions)
+      if torch.random() < epsilon then
+          action = torch.random(#gameActions)
       else
           -- Forward the current state through the network:
           local q = model:forward(currentState)
