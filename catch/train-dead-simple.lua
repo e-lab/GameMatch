@@ -32,7 +32,7 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --gridSize              (default 10)        state is screen resized to this size 
-  --batchSize             (default 64)        batch size for training
+  --batchSize             (default 32)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
   --epochs                (default 1e4)       number of training steps to perform
@@ -244,13 +244,15 @@ for game = 1, opt.epochs do
       -- get a batch of training data to train the model:
       local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, 3*opt.gridSize-1)
 
-      -- Train the network, get error:
-      err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+      -- Train the network, get error: (only train after replay emmeory has been filled)
+      if game > maxMemory then
+        err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+      end
 
       -- display:
       if opt.display then win = image.display({image=screen, zoom=10, win=win, title='Train'}) end
   end
-  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-3/opt.epochs) end -- epsilon update
+  if epsilon > epsilonMinimumValue then epsilon = epsilon - (opt.epsilon-epsilonMinimumValue)/opt.epochs end -- epsilon update
   if game%opt.progFreq==0 then 
     totalCount = totalCount + winCount
     print(string.format("Epoch: %d, err: %.3f, epsilon: %.2f, Accuracy: %.2f, Win count: %d, Total win count: %d, time %.3f", game, err, epsilon, winCount/opt.progFreq, winCount, totalCount, sys.toc()))

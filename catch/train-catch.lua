@@ -32,10 +32,10 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --gridSize              (default 10)        state is screen resized to this size 
-  --batchSize             (default 64)        batch size for training
+  --batchSize             (default 32)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --epochs                (default 5e3)       number of training steps to perform
+  --epochs                (default 1e4)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
@@ -130,13 +130,15 @@ local nRewards = 0
 -- get model:
 local model
   model = nn.Sequential()
-  model:add(nn.View(opt.sFrames*opt.gridSize^2))
-  model:add(nn.Linear(opt.sFrames*opt.gridSize^2, 128))
+  model:add(nn.SpatialConvolution(opt.sFrames, 16, 4,4, 2,2))
+  model:add(nn.SpatialMaxPooling(2,2, 2,2))
+  model:add(nn.View(16*4))
+  model:add(nn.Linear(16*4, 128))
   model:add(nn.ReLU())
   model:add(nn.Linear(128, #gameActions))
 local criterion = nn.MSECriterion() 
 -- test:
--- print(model:forward(torch.Tensor(opt.sFrames,opt.gridSize,opt.gridSize)))
+print(model:forward(torch.Tensor(opt.sFrames,opt.gridSize,opt.gridSize)))
 print('This is the model:', model)
 
 
@@ -232,7 +234,7 @@ for game = 1, opt.epochs do
       local reward, screen, gameOver = gameEnv:step(gameActions[action])
       -- nextState = getSimpleState(screen)
       for i=1,opt.sFrames-1 do nextState[i] = nextState[i+1] end -- prepare last opt.sFrames frames in sequence
-      nextState[opt.sFrames] = screen:clone()
+      nextState[opt.sFrames] = screen
 
       -- count rewards:
       if (reward == 1) then winCount = winCount + 1 end
@@ -251,13 +253,15 @@ for game = 1, opt.epochs do
       -- get a batch of training data to train the model:
       local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, opt.gridSize)
 
-      -- Train the network, get error:
-      err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+      -- Train the network, get error: (only train after replay emmeory has been filled)
+      if game > maxMemory then
+        err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
+      end
 
       -- display:
       if opt.display then win = image.display({image=screen, zoom=10, win=win, title='Train'}) end
   end
-  if epsilon > epsilonMinimumValue then epsilon = epsilon*(1-3/opt.epochs) end -- epsilon update
+  if epsilon > epsilonMinimumValue then epsilon = epsilon - (opt.epsilon-epsilonMinimumValue)/opt.epochs end -- epsilon update
   if game%opt.progFreq==0 then 
     totalCount = totalCount + winCount
     print(string.format("Epoch: %d, err: %.3f, epsilon: %.2f, Accuracy: %.2f, Win count: %d, Total win count: %d, time %.3f", game, err, epsilon, winCount/opt.progFreq, winCount, totalCount, sys.toc()))

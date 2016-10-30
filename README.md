@@ -47,12 +47,10 @@ Requires: https://github.com/Kaixhin/rlenvs
 
 To play game: `qlua play-catch.lua`
 
-Train: `train-catch.lua` same training code as for atari (never managed to get it working)
-
-Train: `train-catch-new.lua`is inspired by: https://github.com/SeanNaren/QlearningExample.torch and blog post: https://edersantana.github.io/articles/keras_rl/
+Train: `train-catch.lua` is a CNN version and is
 
 
-Note: we used convolutional neural nets, as opposed to standard neural nets in our code. The CNN do not train as well and fast, and with small game grids of 10x10 it converges, but with larger grids, such as 24x24 it did not converge / learned to play well after 1e5 iterations~!
+Train: `train-dead-simple.lua`is inspired by: https://github.com/SeanNaren/QlearningExample.torch and blog post: https://edersantana.github.io/articles/keras_rl/. Works in 10,000 epochs and reports accuracy of 60-80% with default parameters.
 
 
 
