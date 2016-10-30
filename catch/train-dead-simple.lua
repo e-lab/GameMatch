@@ -205,15 +205,15 @@ local totalCount = 0
 for game = 1, opt.epochs do
   sys.tic()
   -- Initialize the environment
+  local screen, action, currentState, nextState, reward, gameOver
   local err = 0
   local isGameOver = false
 
   -- The initial state of the environment
-  local screen = gameEnv:start()
+  screen = gameEnv:start()
   currentState = getSimpleState(screen)
 
   while (isGameOver ~= true) do
-      local action
       -- random action or an action from the policy network:
       if math.random() < epsilon then
           action = math.random(1, #gameActions)
@@ -225,7 +225,7 @@ for game = 1, opt.epochs do
           action = index[1]
       end
 
-      local reward, screen, gameOver = gameEnv:step(gameActions[action])
+      reward, screen, gameOver = gameEnv:step(gameActions[action])
       nextState = getSimpleState(screen)
       -- count rewards:
       if (reward == 1) then winCount = winCount + 1 end
