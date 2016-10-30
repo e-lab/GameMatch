@@ -182,21 +182,6 @@ local sgdParams = {
     nesterov = true
 }
 
--- simple state: just get ball X,Y and paddle X position and concatenate these values!
-local function getSimpleState(inState)
-  local val, ballx, bally, paddlex1
-  -- print(inState)
-  bally = inState[{{},{1,opt.gridSize-1},{}}]:max(2):squeeze()
-  ballx = inState[{{},{1,opt.gridSize-1},{}}]:max(3):squeeze()
-  paddlex1 = inState[{{},{opt.gridSize},{}}]:max(2):squeeze()
-  -- print(ballx, bally, paddlex1)
-  local out = torch.cat(ballx, bally)
-  out = torch.cat(out, paddlex1)
-  -- print(out)
-  -- io.read()
-  return out
-end
-
 
 local memory = Memory(maxMemory, discount)
 local epsilon = opt.epsilon
