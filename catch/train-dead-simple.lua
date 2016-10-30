@@ -35,7 +35,7 @@ opt = lapp [[
   --batchSize             (default 64)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --epochs                (default 5e3)       number of training steps to perform
+  --epochs                (default 1e4)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
