@@ -33,9 +33,9 @@ opt = lapp [[
   -m,--momentum           (default 0.9)       momentum parameter
   --gridSize              (default 10)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
-  --maxMemory             (default 1e3)       Experience Replay buffer memory
+  --maxMemory             (default 1e4)       Experience Replay buffer memory
   --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --epochs                (default 1e4)       number of training steps to perform
+  --epochs                (default 1e5)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
   --useGPU                                    use GPU in training
   --gpuId                 (default 1)         which GPU to use
@@ -130,12 +130,12 @@ local nRewards = 0
 -- get model:
 local model
   model = nn.Sequential()
-  model:add(nn.SpatialConvolution(opt.sFrames, 16, 4,4, 2,2))
+  model:add(nn.SpatialConvolution(opt.sFrames, 32, 4,4, 2,2))
   model:add(nn.SpatialMaxPooling(2,2, 2,2))
-  model:add(nn.View(16*4))
-  model:add(nn.Linear(16*4, 128))
+  model:add(nn.View(32*4))
+  model:add(nn.Linear(32*4, 256))
   model:add(nn.ReLU())
-  model:add(nn.Linear(128, #gameActions))
+  model:add(nn.Linear(256, #gameActions))
 local criterion = nn.MSECriterion() 
 -- test:
 print(model:forward(torch.Tensor(opt.sFrames,opt.gridSize,opt.gridSize)))

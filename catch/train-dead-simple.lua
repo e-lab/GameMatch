@@ -34,11 +34,8 @@ opt = lapp [[
   --gridSize              (default 10)        state is screen resized to this size 
   --batchSize             (default 32)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
-  --sFrames               (default 4)         input frames to stack as input / learn every update_freq steps of game
-  --epochs                (default 1e4)       number of training steps to perform
+  --epochs                (default 1.1e4)     number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
-  --useGPU                                    use GPU in training
-  --gpuId                 (default 1)         which GPU to use
   --largeSimple                               simple model or not
 
   Display and save parameters:
@@ -135,7 +132,7 @@ local model
   model:add(nn.Linear(128, #gameActions))
 local criterion = nn.MSECriterion() 
 -- test:
--- print(model:forward(torch.Tensor(opt.sFrames,opt.gridSize,opt.gridSize)))
+-- print(model:forward(torch.Tensor(3*opt.gridSize-1)))
 print('This is the model:', model)
 
 
