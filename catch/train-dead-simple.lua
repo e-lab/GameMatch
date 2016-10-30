@@ -245,7 +245,7 @@ for game = 1, opt.epochs do
       local inputs, targets = memory.getBatch(model, opt.batchSize, #gameActions, 3*opt.gridSize-1)
 
       -- Train the network, get error: (only train after replay emmeory has been filled)
-      if game > maxMemory then
+      if game > opt.maxMemory then
         err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
       end
 
