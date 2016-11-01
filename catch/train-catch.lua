@@ -61,7 +61,6 @@ local nbStates = gridSize * gridSize
 local discount = opt.discount
 
 
-
 -- memory for experience replay:
 local function Memory(maxMemory, discount)
     local memory = {}
@@ -151,7 +150,7 @@ local sgdParams = {
 -- Mean Squared Error for our loss function.
 local criterion = nn.MSECriterion()
 
-local env = CatchEnvironment(gridSize)
+local gameEnv = CatchEnvironment(gridSize)
 local memory = Memory(maxMemory, discount)
 local epsUpdate = (epsilon - epsilonMinimumValue)/epoch
 local winCount = 0
@@ -160,11 +159,11 @@ print('Begin training:')
 for i = 1, epoch do
     -- Initialise the environment.
     local err = 0
-    env.reset()
+    gameEnv.reset()
     local isGameOver = false
 
     -- The initial state of the environment.
-    local currentState = env.observe()
+    local currentState = gameEnv.observe()
 
     while not isGameOver do
         local action
@@ -179,7 +178,7 @@ for i = 1, epoch do
             action = index[1]
         end
 
-        local nextState, reward, gameOver = env.act(action)
+        local nextState, reward, gameOver = gameEnv.act(action)
         if (reward == 1) then winCount = winCount + 1 end
         memory.remember({
             inputState = currentState,
