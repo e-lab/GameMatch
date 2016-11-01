@@ -156,7 +156,8 @@ local epsUpdate = (epsilon - epsilonMinimumValue)/epoch
 local winCount = 0
 
 print('Begin training:')
-for i = 1, epoch do
+for game = 1, epoch do
+    sys.tic()
     -- Initialise the environment.
     local err = 0
     gameEnv.reset()
@@ -197,9 +198,9 @@ for i = 1, epoch do
         -- Train the network which returns the error.
         err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
     end
-        local period = 100
-    if i%period == 0 then 
-        print(string.format("Epoch %d : epsilon %.2f : err = %f : Win count %d : Accuracy: %.2f", i, epsilon, err, winCount, winCount/period))
+    if game%opt.progFreq == 0 then 
+        print(string.format("Game %d, epsilon %.2f, err = %.4f, Win count %d, Accuracy: %.2f, time [ms]: %d", 
+                             game,    epsilon,      err,        winCount,     winCount/opt.progFreq, sys.toc()*1000))
         winCount = 0
     end
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
