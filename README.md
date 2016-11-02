@@ -43,14 +43,12 @@ It will save if reward is given regardless of sampling freq
 
 # Catch:
 
-Requires: https://github.com/Kaixhin/rlenvs
+Train: `th train-catch.lua --modelType cnn` is a CNN version and delivers up to 80% accuracy
 
-To play game: `qlua play-catch.lua`
-
-Train: `train-catch.lua` is a CNN version and is
+`th train-catch.lua` runs an MLP version with slightly lower performance
 
 
-Train: `train-dead-simple.lua`is inspired by: https://github.com/SeanNaren/QlearningExample.torch and blog post: https://edersantana.github.io/articles/keras_rl/. Works in 10,000 epochs and reports accuracy of 60-80% with default parameters.
+Test: `qlua test-catch.lua catch-model-grid.net 10` to run it in test mode
 
 
 
