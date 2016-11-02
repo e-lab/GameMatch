@@ -34,7 +34,7 @@ opt = lapp [[
   --maxMemory             (default 0.5e3)     Experience Replay buffer memory
   --epoch                 (default 1e3)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
-  --largeSimple                               simple model or not
+  --modelType             (default 'mlp')     neural net model type: cnn, mlp
 
   Display and save parameters:
   --zoom                  (default 4)        zoom window
@@ -131,11 +131,28 @@ end
 
 -- Create the base model.
 local model = nn.Sequential()
-model:add(nn.Linear(nbStates, hiddenSize))
-model:add(nn.ReLU())
-model:add(nn.Linear(hiddenSize, hiddenSize))
-model:add(nn.ReLU())
-model:add(nn.Linear(hiddenSize, nbActions))
+if opt.modelType == 'mlp' then
+    model:add(nn.Linear(nbStates, hiddenSize))
+    model:add(nn.ReLU())
+    model:add(nn.Linear(hiddenSize, hiddenSize))
+    model:add(nn.ReLU())
+    model:add(nn.Linear(hiddenSize, nbActions))
+    -- test:
+    print('test model:', model:forward(torch.Tensor(nbStates)))
+elseif opt.modelType == 'cnn' then
+    model:add(nn.View(1, gridSize, gridSize))
+    model:add(nn.SpatialConvolution(1, 32, 4,4, 2,2))
+    model:add(nn.ReLU())
+    model:add(nn.View(32*16))
+    model:add(nn.Linear(32*16, hiddenSize))
+    model:add(nn.ReLU())
+    model:add(nn.Linear(hiddenSize, nbActions))
+    -- test:
+    print('test model:', model:forward(torch.Tensor(gridSize, gridSize)))
+else
+    print('model type not recognized')
+end
+
 
 -- Params for Stochastic Gradient Descent (our optimizer).
 local sgdParams = {
