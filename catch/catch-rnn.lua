@@ -32,7 +32,7 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --batchSize             (default 1)         batch size for training
-  --maxMemory             (default 100)       Experience Replay buffer memory
+  --maxMemory             (default 1e3)       Experience Replay buffer memory
   --epoch                 (default 1e5)       number of training steps to perform
   
   Model parameters:
@@ -235,5 +235,5 @@ for game = 1, epoch do
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
--- torch.save("catch-model-grid.net", model)
--- print("Model saved!")
+torch.save("catch-model-rnn.net", model)
+print("Model saved!")
