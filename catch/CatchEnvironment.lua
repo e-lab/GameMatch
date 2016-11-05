@@ -1,5 +1,5 @@
 --[[ The environment: Handles interactions and contains the state of the environment]] --
-function CatchEnvironment(gridSize)
+local function CatchEnvironment(gridSize)
     local env = {}
     local state
     -- Returns the state of the environment.
@@ -77,3 +77,4 @@ function CatchEnvironment(gridSize)
 
     return env
 end
+return CatchEnvironment
