@@ -13,6 +13,10 @@ require 'pl'
 local of = require 'opt'
 local opt = of.parse(arg)
 
+if opt.useGpu then 
+	require 'cudnn'
+	require 'cutorch'
+end
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
@@ -21,6 +25,7 @@ local CatchEnvironment = require 'CatchEnvironment'
 local Memory = require 'memory'
 local Tr = require 'train'
 local tr = Tr(opt)
+print('Use GPU? :',tr.useGpu)
 
 -- os.execute('mkdir '..opt.savedir)
 
@@ -58,7 +63,7 @@ for game = 1, epoch do
             action = torch.random(1, nbActions)
         else
             -- Forward the current state through the network.
-            local q = tr.model:forward(currentState)
+            local q = tr:predict(currentState)
             -- Find the max index (the chosen action).
             local max, index = torch.max(q, 1)
             action = index[1]
@@ -78,10 +83,10 @@ for game = 1, epoch do
         isGameOver = gameOver
 
         -- We get a batch of training data to train the model.
-        local inputs, targets = memory.getBatch(tr.model, batchSize, nbActions, nbStates)
+        local inputs, targets = memory.getBatch(tr.model, batchSize, nbActions, nbStates,opt.useGpu)
 
         -- Train the network which returns the error.
-        err = err + tr:forward(inputs, targets)
+        err = err + tr:train(inputs, targets)
 
         -- display
         if opt.display then 
@@ -89,12 +94,12 @@ for game = 1, epoch do
         end
     end
     if game%opt.progFreq == 0 then 
-        print(string.format("Game %d, epsilon %.2f, err = %.4f, Win count %d, Accuracy: %.2f, time [ms]: %d", 
-                             game,    epsilon,      err,        winCount,     winCount/opt.progFreq, sys.toc()*1000))
+        print(string.format("Game %d, epsilon %.2f, err = %.4f, Win count %d, Accuracy: %.2f, time [ms]: %d , LR : %3f", 
+                             game, epsilon, err, winCount, winCount/opt.progFreq, sys.toc()*1000,tr.optimState.learningRate))
         winCount = 0
     end
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
-torch.save("catch-model-grid.net", model)
+torch.save("catch-model-grid.net", tr.model)
 print("Model saved!")
