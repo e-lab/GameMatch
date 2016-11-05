@@ -20,20 +20,14 @@ Modifier by Eugenio Culurciello to work on Torch7
 
 # How to Run?
 
-**CPU only**
+Requires: https://github.com/imodpasteur/lutorpy
 
-```
-git clone https://github.com/yanpanlau/Keras-FlappyBird.git
-cd Keras-FlappyBird
-python qlearn.py -m "Run"
-```
+Train: `python qlearn.py -m ''`
 
-**GPU version (Theano)**
+This is a python to Torch7 example, based on this: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
-```
-git clone https://github.com/yanpanlau/Keras-FlappyBird.git
-cd Keras-FlappyBird
-THEANO_FLAGS=device=gpu,floatX=float32,lib.cnmem=0.2 python qlearn.py -m "Run"
-```
+This code is very slow and we did not run long enough to see it converge. It may need to be converted to GPU!
+
 
 If you want to train the network from beginning, delete the model.h5 and run qlearn.py -m "Train"
+README.md
