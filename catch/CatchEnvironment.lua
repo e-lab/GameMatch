@@ -55,11 +55,13 @@ function CatchEnvironment(gridSize)
 
     function env.updateState(action)
         if (action == 1) then
-            action = -1
+            action = -1 -- move left
         elseif (action == 2) then
-            action = 0
+            action = 0 -- no move == stay
+        elseif (action == 3) then
+            action = 1 -- move right
         else
-            action = 1
+            action = 0
         end
         local fruitRow, fruitColumn, basket = env.getState()
         local newBasket = math.min(math.max(2, basket + action), gridSize - 1) -- The min/max prevents the basket from moving out of the grid.
@@ -67,7 +69,7 @@ function CatchEnvironment(gridSize)
         state = torch.Tensor({ fruitRow, fruitColumn, newBasket })
     end
 
-    -- Action can be 1 (move left) or 2 (move right)
+    -- Action can be 1 (move left) or 3 (move right) or 2 (no move / stay)
     function env.act(action)
         env.updateState(action)
         local reward = env.getReward()

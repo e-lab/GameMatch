@@ -77,9 +77,6 @@ local function Memory(maxMemory, discount)
             -- Remove the earliest memory to allocate new experience to memory.
             table.remove(memory, 1)
         end
-        -- require 'env'
-        -- print(memory[#memory].actions[1])
-        -- io.read()
     end
 
     function memory.getBatch(batchSize, nbActions, nbStates)
@@ -94,8 +91,8 @@ local function Memory(maxMemory, discount)
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
             local randomIndex = torch.random(1, memoryLength)
-            inputs[i] = memory[randomIndex].states
-            targets[i]= memory[randomIndex].actions
+            inputs[i] = memory[randomIndex].states:float() -- save as byte, use as float
+            targets[i]= memory[randomIndex].actions:float()
         end
 
         return inputs, targets
@@ -179,7 +176,7 @@ for game = 1, epoch do
     sys.tic()
     -- Initialise the environment.
     local err = 0
-    local steps = 0
+    local steps = 0 -- counts steps to game win
     gameEnv.reset()
     local isGameOver = false
 
@@ -208,8 +205,8 @@ for game = 1, epoch do
         if (reward == 1) then 
             winCount = winCount + 1 
             memory.remember({
-                states = seqMem,
-                actions = seqAct
+                states = seqMem:byte(), -- save as byte, use as float
+                actions = seqAct:byte()
             })
             -- We get a batch of training data to train the model.
             local inputs, targets = memory.getBatch(batchSize, nbActions, nbStates)
