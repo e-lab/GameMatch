@@ -3,7 +3,7 @@
 -- learning with RNN
 
 -- playing CATCH version:
--- https://github.com/SeanNaren/QlearningExample.torch
+-- loosely based on: https://github.com/SeanNaren/QlearningExample.torch
 
 require 'CatchEnvironment'
 require 'torch'
