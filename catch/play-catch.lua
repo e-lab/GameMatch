@@ -94,5 +94,6 @@ qt.connect(win.listener,
             else
                 action = 2
             end
+            qtimer:start()
          end)
 qtimer:start()

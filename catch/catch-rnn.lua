@@ -23,7 +23,8 @@ opt = lapp [[
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
   --nbActions           (default 3)           catch number of actions
-  
+  --playFile            (default '')          human play file to initialize exp. replay memory
+
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
@@ -68,8 +69,16 @@ local nSeq = gridSize-2 -- RNN sequence length in this game is grid size
 
 -- memory for experience replay:
 local function Memory(maxMemory, discount)
-    local memory = {}
+    local memory
 
+    if opt.playFile ~= '' then
+        memory = torch.load(opt.playFile)
+        print('Loaded experience replay memory with play file:', opt.playFile)
+    else
+        memory = {}
+        print('Initialized empty experience replay memory')
+    end
+    
     -- Appends the experience to the memory.
     function memory.remember(memoryInput)
         table.insert(memory, memoryInput)
