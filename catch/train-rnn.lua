@@ -145,8 +145,8 @@ end
 
 -- Create the base RNN model:
 local model, prototype
-local RNNh0={}
-local RNNh={} --= nn.Sequential()
+local RNNh0 = {} -- initial state
+local RNNh = {} -- state to loop through prototype in inference
 
 print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
     '\n- layers:', opt.nLayers, '\n- output size:',  nbActions, '\n- sequence lenght:',  nSeq)
@@ -156,7 +156,7 @@ model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, n
 -- Default RNN intial state set to zero:
 for l = 1, opt.nLayers do
    RNNh0[l] = torch.zeros(opt.nHidden)
-   -- RNNh[l] = RNNh0[l]:clone()
+   RNNh[l] = torch.zeros(opt.nHidden)
 end
 
 
@@ -192,17 +192,19 @@ for game = 1, epoch do
     -- The initial state of the environment.
     local currentState = gameEnv.observe()
 
+    -- rest RNN to intial state:
+    RNNh = table.unpack(RNNh0)
+
     while not isGameOver do
         steps = steps+1
-        local action
+        local action, q
+        q = prototype:forward({currentState, RNNh}) -- Forward the current state through the network.
+        RNNh = q[1]
         -- Decides if we should choose a random action, or an action from the policy network.
-        -- print(torch.uniform())
         if torch.uniform() < epsilon then
             action = torch.random(1, nbActions)
             -- print(action)
         else
-            -- Forward the current state through the network.
-            local q = prototype:forward( {currentState, table.unpack(RNNh0)} )
             -- Find the max index (the chosen action).
             local max, index = torch.max(q[2], 1) -- [2] is the output, [1] is state...
             action = index[1]
