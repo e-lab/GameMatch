@@ -23,9 +23,7 @@ if opt.rnn then require 'nngraph' end
 
 -- Initialise and start environment
 local gameEnv = CatchEnvironment(opt.gridSize)
-
 local episodes, totalReward = 0, 0
-
 
 -- load trained network:
 local model = torch.load(opt.fpath)
@@ -44,17 +42,8 @@ else
   print('Model is:', model)
 end
 
--- Converts input tensor into table of dimension equal to first dimension of input tensor
--- and adds padding of zeros, which in this case are states
-local function tensor2Table(inputTensor, padding)
-   local outputTable = {}
-   for t = 1, inputTensor:size(1) do outputTable[t] = inputTensor[t] end
-   for l = 1, padding do outputTable[l + inputTensor:size(1)] = h0[l]:clone() end
-   return outputTable
-end
-
-
 local win, reward, isGameOver, screen, action
+print('Begin playing...') -- and play:
 while true do
   gameEnv:reset()
   screen = gameEnv.observe()
@@ -76,7 +65,7 @@ while true do
     if reward == 1 then totalReward = totalReward + reward end
     
     win = image.display({image=screen:view(opt.gridSize,opt.gridSize), zoom=10, win=win})
-    -- os.execute('sleep 0.3')
+    sys.sleep(0.1)
 
     if isGameOver then
       episodes = episodes + 1
