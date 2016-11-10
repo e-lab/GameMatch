@@ -4,6 +4,10 @@
 -- Written by: Abhishek Chaurasia
 --------------------------------------------------------------------------------
 
+if opt.fw then require 'FastWeights' end
+require 'nngraph' -- IMPORTANT!!! require nngraph after adding our nn module!!!!
+-- otherwise it will not inherit the right overloaded functions!
+
 local RNN = {}
 
 --[[
@@ -43,7 +47,7 @@ local RNN = {}
 -- K   : # of output neurons
 
 -- Returns a simple RNN model
-local function getPrototype(n, d, nHL, K)
+local function getPrototype(n, d, nHL, K, nFW)
    local inputs = {}
    table.insert(inputs, nn.Identity()())       -- input X
    for j = 1, nHL do
@@ -69,12 +73,19 @@ local function getPrototype(n, d, nHL, K)
                                 style = 'filled',
                                 fillcolor = 'lightpink'}}
 
-      -- next state best version:
       local Wh = {hPrev} - nn.Linear(d, d) - nn.Tanh()
       local Cx = {x} - nn.Linear(n, d) - nn.Tanh()
-      local nextH = {Wh, Cx} - nn.CAddTable()
+      
+      local FWMod, hFW, nextH
+      if opt.fw then -- compute fast weights output:
+        FWMod = nn.FastWeights(nFW, d)
+        hFW = {hPrev} - FWMod
+        nextH = {Wh, Cx, hFW} - nn.CAddTable()
+      else
+        nextH = {Wh, Cx} - nn.CAddTable()
+      end
       -- local nextH = {x, hPrev} - nn.JoinTable(1) - nn.Linear(nIn + d, d) - nn.Tanh() -- older simple RNN version
-                    :annotate{name = 'h^('..j..')[t]',
+      nextH:annotate{name = 'h^('..j..')[t]',
                      graphAttributes = {
                      style = 'filled',
                      fillcolor = 'skyblue'}}
@@ -89,13 +100,18 @@ local function getPrototype(n, d, nHL, K)
                     fillcolor = 'seagreen1'}}
    table.insert(outputs, logsoft)
 
+   -- add to FastWeight module memory:
+   if opt.fw and torch.isTensor(nextH) then
+      FWMod:updatePrevOuts(nextH)
+    end
+
    -- Output is table with {h, prediction}
    return nn.gModule(inputs, outputs)
 end
 
 -- Links all the RNN models, given the # of sequences
-function RNN.getModel(n, d, nHL, K, T)
-   local prototype = getPrototype(n, d, nHL, K)
+function RNN.getModel(n, d, nHL, K, T, nFW)
+   local prototype = getPrototype(n, d, nHL, K, nFW)
 
    local clones = {}
    for i = 1, T do

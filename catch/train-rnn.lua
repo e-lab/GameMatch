@@ -11,7 +11,6 @@ require 'nn'
 require 'image'
 require 'optim'
 require 'nngraph'
-local rnn = require 'RNN'
 
 require 'pl'
 lapp = require 'pl.lapp'
@@ -37,8 +36,10 @@ opt = lapp [[
   --epoch                 (default 1e5)       number of training steps to perform
   
   Model parameters:
+  --fw                                        Use FastWeights or not
   --nLayers               (default 1)         RNN layers
   --nHidden               (default 128)       RNN hidden size
+  --nFW                   (default 4)         number of fast weights previous vectors
 
   Display and save parameters:
   --zoom                  (default 4)        zoom window
@@ -47,6 +48,8 @@ opt = lapp [[
   --savedir          (default './results')   subdirectory to save experiments in
   --progFreq              (default 1e2)       frequency of progress output
 ]]
+
+local rnn = require 'RNN'
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -148,10 +151,16 @@ local model, prototype
 local RNNh0 = {} -- initial state
 local RNNh = {} -- state to loop through prototype in inference
 
-print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
-    '\n- layers:', opt.nLayers, '\n- output size:',  nbActions, '\n- sequence lenght:',  nSeq)
-
-model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
+if opt.fw then
+  print('Created fast-weights RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
+    '\n- layers:', opt.nLayers, '\n- output size:',  nbActions, '\n- sequence length:', nSeq, 
+    '\n- fast weights states:', opt.nFW)
+  model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq, opt.nFW)
+else
+  print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
+      '\n- layers:', opt.nLayers, '\n- output size:',  nbActions, '\n- sequence lenght:',  nSeq)
+  model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
+end
 
 -- Default RNN intial state set to zero:
 for l = 1, opt.nLayers do
