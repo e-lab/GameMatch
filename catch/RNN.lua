@@ -76,11 +76,12 @@ local function getPrototype(n, d, nHL, K, nFW)
       local Wh = {hPrev} - nn.Linear(d, d) - nn.Tanh()
       local Cx = {x} - nn.Linear(n, d) - nn.Tanh()
       
-      local FWMod, hFW, nextH
+      local nextH
       if opt.fw then -- compute fast weights output:
-        FWMod = nn.FastWeights(nFW, d)
-        hFW = {hPrev} - FWMod
+        local FWMod = nn.FastWeights(nFW, d)
+        local hFW = {hPrev} - FWMod
         nextH = {Wh, Cx, hFW} - nn.CAddTable()
+        if torch.isTensor(nextH) then print('UPDATE!') FWMod:updatePrevOuts(nextH) end
       else
         nextH = {Wh, Cx} - nn.CAddTable()
       end
@@ -99,11 +100,6 @@ local function getPrototype(n, d, nHL, K, nFW)
                     style = 'filled',
                     fillcolor = 'seagreen1'}}
    table.insert(outputs, logsoft)
-
-   -- add to FastWeight module memory:
-   if opt.fw and torch.isTensor(nextH) then
-      FWMod:updatePrevOuts(nextH)
-    end
 
    -- Output is table with {h, prediction}
    return nn.gModule(inputs, outputs)

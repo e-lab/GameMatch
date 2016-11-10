@@ -39,7 +39,7 @@ opt = lapp [[
   --fw                                        Use FastWeights or not
   --nLayers               (default 1)         RNN layers
   --nHidden               (default 128)       RNN hidden size
-  --nFW                   (default 4)         number of fast weights previous vectors
+  --nFW                   (default 8)         number of fast weights previous vectors
 
   Display and save parameters:
   --zoom                  (default 4)        zoom window
