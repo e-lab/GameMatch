@@ -9,3 +9,7 @@
 *.eps
 
 *.model
+
+*.svg
+
+*.dot
