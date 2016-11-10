@@ -69,8 +69,11 @@ local function getPrototype(n, d, nHL, K)
                                 style = 'filled',
                                 fillcolor = 'lightpink'}}
 
-      -- Concat input with previous state
-      local nextH = ({x, hPrev} - nn.JoinTable(1) - nn.Linear(nIn + d, d) - nn.Tanh())
+      -- next state best version:
+      local Wh = {hPrev} - nn.Linear(d, d) - nn.Tanh()
+      local Cx = {x} - nn.Linear(n, d) - nn.Tanh()
+      local nextH = {Wh, Cx} - nn.CAddTable()
+      -- local nextH = {x, hPrev} - nn.JoinTable(1) - nn.Linear(nIn + d, d) - nn.Tanh() -- older simple RNN version
                     :annotate{name = 'h^('..j..')[t]',
                      graphAttributes = {
                      style = 'filled',
