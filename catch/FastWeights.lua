@@ -56,7 +56,7 @@ function FastWeights:updateOutput(input)
 end
 
 function FastWeights:updateGradInput(input, gradOutput)
-      self.gradInput:resizeAs(input):zero()
+   self.gradInput = gradOutput
    return self.gradInput
 end
 

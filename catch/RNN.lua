@@ -54,7 +54,8 @@ local function getPrototype(n, d, nHL, K, nFW)
       table.insert(inputs, nn.Identity()())    -- previous states h[j]
    end
 
-   local x, nIn
+   local x, nIn, nextH, hPrev, Wh, Cx, hFW, logsoft
+   local FWMod -- module for fast weights
    local outputs = {}
    for j = 1, nHL do
       if j == 1 then
@@ -68,20 +69,19 @@ local function getPrototype(n, d, nHL, K, nFW)
          nIn = d
       end
 
-      local hPrev = inputs[j+1]:annotate{name = 'h^('..j..')[t-1]',
-                                graphAttributes = {
-                                style = 'filled',
-                                fillcolor = 'lightpink'}}
+      hPrev = inputs[j+1]:annotate{name = 'h^('..j..')[t-1]',
+                                   graphAttributes = {
+                                   style = 'filled',
+                                   fillcolor = 'lightpink'}}
 
-      local Wh = {hPrev} - nn.Linear(d, d) - nn.Tanh()
-      local Cx = {x} - nn.Linear(n, d) - nn.Tanh()
+      Wh = {hPrev} - nn.Linear(d, d) - nn.Tanh()
+      Cx = {x} - nn.Linear(n, d) - nn.Tanh()
       
-      local nextH
       if opt.fw then -- compute fast weights output:
-        local FWMod = nn.FastWeights(nFW, d)
-        local hFW = {hPrev} - FWMod
+        FWMod = nn.FastWeights(nFW, d)
+        hFW = {hPrev} - FWMod
         nextH = {Wh, Cx, hFW} - nn.CAddTable()
-        if torch.isTensor(nextH) then print('UPDATE!') FWMod:updatePrevOuts(nextH) end
+        if torch.isTensor(nextH) then print('UPDATE!') FWMod:updatePrevOuts(nextH) end -- DOES NOT WORK!!!!!
       else
         nextH = {Wh, Cx} - nn.CAddTable()
       end
@@ -94,8 +94,8 @@ local function getPrototype(n, d, nHL, K, nFW)
       table.insert(outputs, nextH)
    end
 
-   local logsoft = (outputs[#outputs] - nn.Linear(d, K) - nn.LogSoftMax())
-                   :annotate{name = 'y\'[t]',
+   logsoft = (outputs[#outputs] - nn.Linear(d, K) - nn.LogSoftMax())
+          :annotate{name = 'y\'[t]',
                     graphAttributes = {
                     style = 'filled',
                     fillcolor = 'seagreen1'}}
