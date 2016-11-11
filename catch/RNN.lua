@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
--- A simple RNN block
---
+-- A simple RNN block + fast weights: https://arxiv.org/abs/1610.06258
 -- Written by: Abhishek Chaurasia
+-- fast weight added by Eugenio Culurciello, November 2016
 --------------------------------------------------------------------------------
 
 if opt.fw then require 'FastWeights' end
