@@ -4,6 +4,8 @@
 -- test fast weights module
 --
 
+torch.manualSeed(0)
+
 require 'nn'
 require 'FastWeights'
 
