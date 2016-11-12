@@ -49,6 +49,11 @@ local RNN = {}
 -- NOTE: this RNN is more complex than: https://github.com/e-lab/torch7-demos/blob/master/RNN-train-sample/RNN.lua
 -- it uses projections of input and hidden space and sums them
 
+-- NOTE 2: this fast weights implementation differs from: https://arxiv.org/abs/1610.06258
+-- here we use SoftMax to normalize fast weight hidden vector, also FastWeight module saves its outputs to a memory
+-- instead of saving the hidden states after being summed to input projection
+-- this implementation is similar to a focused attentional mechanisms on recent hidden weights, using a fast associative memory
+
 -- Returns a simple RNN model
 local function getPrototype(n, d, nHL, K, nFW)
    local inputs = {}
