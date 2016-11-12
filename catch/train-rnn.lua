@@ -56,7 +56,6 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 -- os.execute('mkdir '..opt.savedir)
 
-
 local epsilon = opt.epsilon
 local epsilonMinimumValue = opt.epsilonMinimumValue
 local nbActions = opt.nbActions
@@ -167,7 +166,6 @@ for l = 1, opt.nLayers do
    RNNh0[l] = torch.zeros(opt.nHidden)
    RNNh[l] = torch.zeros(opt.nHidden)
 end
-
 
 -- Params for Stochastic Gradient Descent (our optimizer).
 local sgdParams = {
