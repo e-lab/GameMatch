@@ -1,5 +1,9 @@
 # Catch:
 
+This repository is designed to experiment with recent Reinforcement Learning algorithms and implement them in a easy and accessible way. It is designed to be readable, and not efficient.
+
+Yet there RNN + fast weights implementation below is much better than Q-Learning with MLP and CNN.
+
 
 ### RNN version:
 
@@ -15,7 +19,7 @@ RNN + Fast Weight version: a new version is available: `th train-rnn.lua --fw --
 
 ### Q-learning with MLP / CNN:
 
-Train: `th train-catch.lua --modelType cnn` is a CNN version and delivers up to 80% accuracy
+Train: `th train.lua --modelType cnn` is a CNN version and delivers up to 80% accuracy
 
 `th train-catch.lua` runs an MLP version with slightly lower performance
 
