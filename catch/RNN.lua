@@ -8,6 +8,7 @@ if opt.fw then require 'FastWeights' end
 require 'nngraph' -- IMPORTANT!!! require nngraph after adding our nn module!!!!
 -- otherwise it will not inherit the right overloaded functions!
 
+
 local RNN = {}
 
 --[[
@@ -74,14 +75,13 @@ local function getPrototype(n, d, nHL, K, nFW)
                                    style = 'filled',
                                    fillcolor = 'lightpink'}}
 
-      Wh = {hPrev} - nn.Linear(d, d) - nn.Tanh()
-      Cx = {x} - nn.Linear(n, d) - nn.Tanh()
+      Wh = {hPrev} - nn.Linear(d, d) - nn.ReLU()
+      Cx = {x} - nn.Linear(n, d) - nn.ReLU()
       
       if opt.fw then -- compute fast weights output:
         FWMod = nn.FastWeights(nFW, d)
-        hFW = {hPrev} - FWMod
-        nextH = {Wh, Cx, hFW} - nn.CAddTable()
-        if torch.isTensor(nextH) then print('UPDATE!') FWMod:updatePrevOuts(nextH) end -- DOES NOT WORK!!!!!
+        nextH = {hPrev, Cx, Wh} - FWMod
+        -- nextH = {Wh, Cx, hFW} - nn.CAddTable()
       else
         nextH = {Wh, Cx} - nn.CAddTable()
       end
@@ -102,7 +102,10 @@ local function getPrototype(n, d, nHL, K, nFW)
    table.insert(outputs, logsoft)
 
    -- Output is table with {h, prediction}
-   return nn.gModule(inputs, outputs)
+   local prototype = nn.gModule(inputs, outputs)
+   -- graph.dot(prototype.fg, 'proto', 'proto') -- plot to debug
+
+   return prototype
 end
 
 -- Links all the RNN models, given the # of sequences
@@ -170,7 +173,14 @@ function RNN.getModel(n, d, nHL, K, T, nFW)
    end
 
    -- Output is table of {Predictions, Hidden states of last sequence}
+   -- for i = 1, T do
+   --    for l = 1, nHL do
+   --      table.insert(outputs H) --concatenate tables
+   --    end
+   -- end
+   -- print(outputs)
    local g = nn.gModule({inputSequence, table.unpack(H0)}, outputs)
+   graph.dot(g.fg, 'model', 'model') -- plot to debug
 
    return g, clones[1]
 end
