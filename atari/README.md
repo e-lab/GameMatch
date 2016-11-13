@@ -7,6 +7,12 @@ NOT WORKING - DO NOT USE!!!!
 requires [xitari](https://github.com/deepmind/xitari.git) and [alewrap](https://github.com/deepmind/alewrap.git
 )
 
+To install dependencies run bellow with elab account
+
+```
+sh installDependencies.sh
+```
+
 ## training a new RL model
 
 `qlua train.lua --display` to display output game locally on CPU.
