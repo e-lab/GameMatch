@@ -17,7 +17,7 @@ lapp = require 'pl.lapp'
 opt = lapp [[
   
   Game options:
-  --gridSize            (default 10)          game grid size 
+  --gridSize            (default 20)          game grid size 
   --discount            (default 0.9)         discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
@@ -54,7 +54,7 @@ local rnn = require 'RNN'
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
--- os.execute('mkdir '..opt.savedir)
+os.execute('mkdir '..opt.savedir)
 
 local epsilon = opt.epsilon
 local epsilonMinimumValue = opt.epsilonMinimumValue
@@ -250,5 +250,5 @@ for game = 1, epoch do
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
-torch.save("catch-model-rnn.net", prototype:clearState())
+torch.save(opt.savedir.."catch-model-rnn.net", prototype:clearState())
 print("Model saved!")
