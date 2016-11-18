@@ -46,7 +46,7 @@ opt = lapp [[
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
--- os.execute('mkdir '..opt.savedir)
+os.execute('mkdir '..opt.savedir)
 
 
 local epsilon = opt.epsilon
@@ -228,5 +228,5 @@ for game = 1, epoch do
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
-torch.save("catch-model-grid.net", model)
+torch.save(opt.savedir.."/catch-model-grid.net", model)
 print("Model saved!")

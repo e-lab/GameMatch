@@ -250,5 +250,5 @@ for game = 1, epoch do
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
-torch.save(opt.savedir.."catch-model-rnn.net", prototype:clearState())
+torch.save(opt.savedir.."/catch-model-rnn.net", prototype:clearState())
 print("Model saved!")
