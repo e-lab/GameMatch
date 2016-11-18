@@ -27,7 +27,7 @@ opt = lapp [[
   --env_params          (default 'useRGB=true')     string of environment parameters
   --pool_frms_type      (default 'max')             pool inputs frames mode
   --pool_frms_size      (default '4')               pool inputs frames size
-  --actrep              (default 1)                 how many times to repeat action
+  --actrep              (default 10)                 how many times to repeat action, frames to skip to speed up game and inference
   --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
  
   Training parameters:
@@ -85,7 +85,7 @@ local batchSize = opt.batchSize
 local gridSize = opt.gridSize
 local nbStates = gridSize * gridSize
 local discount = opt.discount
-local nSeq = 2*gridSize -- RNN max sequence length in this game is grid size
+local nSeq = 4*gridSize -- RNN max sequence length in this game is grid size
 
 
 -- memory for experience replay:
@@ -247,8 +247,9 @@ for game = 1, epoch do
           seqMem[steps] = currentState -- store state sequence into memory
           seqAct[steps][action] = 1
         end
-        -- local nextState, reward, gameOver = gameEnv.act(action)
+        
         screen, reward, gameOver = gameEnv:step(gameActions[action], true)
+        
         local nextState = preProcess(screen):view(1,-1) -- resize to smaller size
         if (reward == 1) then 
             winCount = winCount + 1 
