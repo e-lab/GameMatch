@@ -7,6 +7,7 @@
 if opt.fw then require 'FastWeights' end
 require 'nngraph' -- IMPORTANT!!! require nngraph after adding our nn module!!!!
 -- otherwise it will not inherit the right overloaded functions!
+-- nngraph.setDebug(true) -- if you need to debug uncomment this
 
 local RNN = {}
 
@@ -87,10 +88,10 @@ local function getPrototype(n, d, nHL, K, nFW)
         hFW = {hPrev} - nn.FastWeights(nFW, d)
         hFWNormed = {hFW} - nn.SoftMax() -- SoftMax used to normalize the results
         Wh = {hFWNormed} - nn.Linear(d, d) - nn.ReLU() -- project fast weights into hidden layer
-        nextH = {Wh, Cx} - nn.CAddTable()
+        nextH = {Wh, Cx} - nn.CAddTable(2)
       else
         Wh = {hPrev} - nn.Linear(d, d) - nn.ReLU()
-        nextH = {Wh, Cx} - nn.CAddTable()
+        nextH = {Wh, Cx} - nn.CAddTable(2)
       end
       nextH:annotate{name = 'h^('..j..')[t]',
                      graphAttributes = {
@@ -138,7 +139,7 @@ function RNN.getModel(n, d, nHL, K, T, nFW)
               fillcolor = 'lightpink'}}
    end
 
-   local splitInput = inputSequence - nn.SplitTable(1)
+   local splitInput = inputSequence - nn.SplitTable(2)
 
    for i = 1, T do
       local x = (splitInput - nn.SelectTable(i))
