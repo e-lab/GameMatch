@@ -88,10 +88,10 @@ local function getPrototype(n, d, nHL, K, nFW)
         hFW = {hPrev} - nn.FastWeights(nFW, d)
         hFWNormed = {hFW} - nn.SoftMax() -- SoftMax used to normalize the results
         Wh = {hFWNormed} - nn.Linear(d, d) - nn.ReLU() -- project fast weights into hidden layer
-        nextH = {Wh, Cx} - nn.CAddTable(2)
+        nextH = {Wh, Cx} - nn.CAddTable()
       else
         Wh = {hPrev} - nn.Linear(d, d) - nn.ReLU()
-        nextH = {Wh, Cx} - nn.CAddTable(2)
+        nextH = {Wh, Cx} - nn.CAddTable()
       end
       nextH:annotate{name = 'h^('..j..')[t]',
                      graphAttributes = {
