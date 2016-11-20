@@ -16,31 +16,33 @@ lapp = require 'pl.lapp'
 opt = lapp [[
   
   Game options:
+  --gridSize            (default 10)          state is screen resized to this size 
   --discount            (default 0.9)         discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
   --nbActions           (default 3)           catch number of actions
   
   Training parameters:
-  --threads               (default 8)         number of threads used by BLAS routines
-  --seed                  (default 1)         initial random seed
-  -r,--learningRate       (default 0.1)       learning rate
-  -d,--learningRateDecay  (default 1e-9)      learning rate decay
-  -w,--weightDecay        (default 0)         L2 penalty on the weights
-  -m,--momentum           (default 0.9)       momentum parameter
-  --gridSize              (default 10)        state is screen resized to this size 
-  --nHidden               (default 100)       hidden states in neural net
-  --batchSize             (default 50)        batch size for training
-  --maxMemory             (default 0.5e3)     Experience Replay buffer memory
-  --epochs                (default 1e3)       number of training steps to perform
-  --progFreq              (default 1e2)       frequency of progress output
-  --modelType             (default 'mlp')     neural net model type: cnn, mlp
+  --threads               (default 8)        number of threads used by BLAS routines
+  --seed                  (default 1)        initial random seed
+  -r,--learningRate       (default 0.1)      learning rate
+  -d,--learningRateDecay  (default 1e-9)     learning rate decay
+  -w,--weightDecay        (default 0)        L2 penalty on the weights
+  -m,--momentum           (default 0.9)      momentum parameter
+  --batchSize             (default 64)       batch size for training
+  --maxMemory             (default 0.5e3)    Experience Replay buffer memory
+  --epochs                (default 1e3)      number of training steps to perform
+  
+  Model parameters:
+  --modelType             (default 'mlp')    neural net model type: cnn, mlp
+  --nHidden               (default 128)      hidden states in neural net
 
   Display and save parameters:
   --zoom                  (default 4)        zoom window
   -v, --verbose           (default 2)        verbose output
   --display                                  display stuff
   --savedir          (default './results')   subdirectory to save experiments in
+  --progFreq              (default 1e2)      frequency of progress output
 ]]
 
 torch.setnumthreads(opt.threads)
@@ -73,8 +75,8 @@ local function Memory(maxMemory, discount)
         local memoryLength = #memory
         local chosenBatchSize = math.min(batchSize, memoryLength)
 
-        local inputs = torch.zeros(chosenBatchSize, nbStates)
-        local targets = torch.zeros(chosenBatchSize, nbActions)
+        local inputs = torch.zeros(batchSize, nbStates)
+        local targets = torch.zeros(batchSize, nbActions)
         --Fill the inputs and targets up.
         for i = 1, chosenBatchSize do
             -- Choose a random memory experience to add to the batch.
@@ -130,7 +132,8 @@ if opt.modelType == 'mlp' then
     model:add(nn.ReLU())
     model:add(nn.Linear(opt.nHidden, nbActions))
     -- test:
-    print('test model:', model:forward(torch.Tensor(nbStates)))
+    local retvt = model:forward(torch.Tensor(nbStates))
+    print('test model:', retvt)
 elseif opt.modelType == 'cnn' then
     model:add(nn.View(1, opt.gridSize, opt.gridSize))
     model:add(nn.SpatialConvolution(1, 32, 4,4, 2,2))
@@ -140,7 +143,8 @@ elseif opt.modelType == 'cnn' then
     model:add(nn.ReLU())
     model:add(nn.Linear(opt.nHidden, nbActions))
     -- test:
-    print('test model:', model:forward(torch.Tensor(gridSize, gridSize)))
+    local retvt = model:forward(torch.Tensor(gridSize, gridSize))
+    print('test model:', retvt)
 else
     print('model type not recognized')
 end
@@ -163,12 +167,13 @@ local gameEnv = CatchEnvironment(gridSize)
 local memory = Memory(maxMemory, discount)
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
+local err = 0
+local randomActions = 0
 
 print('Begin training:')
 for game = 1, opt.epochs do
     sys.tic()
     -- Initialise the environment.
-    local err = 0
     gameEnv.reset()
     local isGameOver = false
 
@@ -178,8 +183,9 @@ for game = 1, opt.epochs do
     while not isGameOver do
         local action
         -- Decides if we should choose a random action, or an action from the policy network.
-        if torch.random() <= epsilon then
+        if torch.uniform() <= epsilon then
             action = torch.random(1, nbActions)
+            randomActions = randomActions + 1
         else
             -- Forward the current state through the network.
             local q = model:forward(currentState)
@@ -213,12 +219,14 @@ for game = 1, opt.epochs do
         end
     end
     if game%opt.progFreq == 0 then 
-        print(string.format("Game %d, epsilon %.2f, err = %.4f, Win count %d, Accuracy: %.2f, time [ms]: %d", 
-                             game,    epsilon,      err,        winCount,     winCount/opt.progFreq, sys.toc()*1000))
+        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Win count: %d, Accuracy: %.2f, time [ms]: %d", 
+                             game,   epsilon,  err/opt.progFreq, randomActions/opt.progFreq,  winCount,  winCount/opt.progFreq, sys.toc()*1000))
         winCount = 0
+        err = 0 
+        randomActions = 0
     end
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
-torch.save(opt.savedir.."/catch-model-grid.net", model)
+torch.save(opt.savedir.."/catch-model.net", model)
 print("Model saved!")
