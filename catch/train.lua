@@ -29,10 +29,10 @@ opt = lapp [[
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
   --gridSize              (default 10)        state is screen resized to this size 
-  --hiddenSize            (default 100)       hidden states in neural net
+  --nHidden               (default 100)       hidden states in neural net
   --batchSize             (default 50)        batch size for training
   --maxMemory             (default 0.5e3)     Experience Replay buffer memory
-  --epoch                 (default 1e3)       number of training steps to perform
+  --epochs                (default 1e3)       number of training steps to perform
   --progFreq              (default 1e2)       frequency of progress output
   --modelType             (default 'mlp')     neural net model type: cnn, mlp
 
@@ -48,18 +48,10 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
-
 local epsilon = opt.epsilon
-local epsilonMinimumValue = opt.epsilonMinimumValue
 local nbActions = opt.nbActions
-local epoch = opt.epoch
-local hiddenSize = opt.hiddenSize
-local maxMemory = opt.maxMemory
-local batchSize = opt.batchSize
 local gridSize = opt.gridSize
 local nbStates = gridSize * gridSize
-local discount = opt.discount
-
 
 -- memory for experience replay:
 local function Memory(maxMemory, discount)
@@ -68,7 +60,7 @@ local function Memory(maxMemory, discount)
     -- Appends the experience to the memory.
     function memory.remember(memoryInput)
         table.insert(memory, memoryInput)
-        if (#memory > maxMemory) then
+        if (#memory > opt.maxMemory) then
             -- Remove the earliest memory to allocate new experience to memory.
             table.remove(memory, 1)
         end
@@ -99,7 +91,7 @@ local function Memory(maxMemory, discount)
                 -- reward + discount(gamma) * max_a' Q(s',a')
                 -- We are setting the Q-value for the action to  r + γmax a’ Q(s’, a’). The rest stay the same
                 -- to give an error of 0 for those outputs.
-                target[memoryInput.action] = memoryInput.reward + discount * nextStateMaxQ
+                target[memoryInput.action] = memoryInput.reward + opt.discount * nextStateMaxQ
             end
             -- Update the inputs and targets.
             inputs[i] = memoryInput.inputState
@@ -132,21 +124,21 @@ end
 -- Create the base model.
 local model = nn.Sequential()
 if opt.modelType == 'mlp' then
-    model:add(nn.Linear(nbStates, hiddenSize))
+    model:add(nn.Linear(nbStates, opt.nHidden))
     model:add(nn.ReLU())
-    model:add(nn.Linear(hiddenSize, hiddenSize))
+    model:add(nn.Linear(opt.nHidden, opt.nHidden))
     model:add(nn.ReLU())
-    model:add(nn.Linear(hiddenSize, nbActions))
+    model:add(nn.Linear(opt.nHidden, nbActions))
     -- test:
     print('test model:', model:forward(torch.Tensor(nbStates)))
 elseif opt.modelType == 'cnn' then
-    model:add(nn.View(1, gridSize, gridSize))
+    model:add(nn.View(1, opt.gridSize, opt.gridSize))
     model:add(nn.SpatialConvolution(1, 32, 4,4, 2,2))
     model:add(nn.ReLU())
     model:add(nn.View(32*16))
-    model:add(nn.Linear(32*16, hiddenSize))
+    model:add(nn.Linear(32*16, opt.nHidden))
     model:add(nn.ReLU())
-    model:add(nn.Linear(hiddenSize, nbActions))
+    model:add(nn.Linear(opt.nHidden, nbActions))
     -- test:
     print('test model:', model:forward(torch.Tensor(gridSize, gridSize)))
 else
@@ -169,11 +161,11 @@ local criterion = nn.MSECriterion()
 
 local gameEnv = CatchEnvironment(gridSize)
 local memory = Memory(maxMemory, discount)
-local epsUpdate = (epsilon - epsilonMinimumValue)/epoch
+local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
 
 print('Begin training:')
-for game = 1, epoch do
+for game = 1, opt.epochs do
     sys.tic()
     -- Initialise the environment.
     local err = 0
@@ -210,7 +202,7 @@ for game = 1, epoch do
         isGameOver = gameOver
 
         -- We get a batch of training data to train the model.
-        local inputs, targets = memory.getBatch(model, batchSize, nbActions, nbStates)
+        local inputs, targets = memory.getBatch(model, opt.batchSize, nbActions, nbStates)
 
         -- Train the network which returns the error.
         err = err + trainNetwork(model, inputs, targets, criterion, sgdParams)
@@ -226,7 +218,7 @@ for game = 1, epoch do
         winCount = 0
     end
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
-    if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
+    if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
 end
 torch.save(opt.savedir.."/catch-model-grid.net", model)
 print("Model saved!")
