@@ -19,7 +19,7 @@ opt = lapp [[
   --gridSize            (default 10)          state is screen resized to this size 
   --discount            (default 0.9)         discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
-  --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
+  --epsilonMinimumValue (default 0.05)        final value of ϵ-greedy action selection
   --nbActions           (default 3)           catch number of actions
   
   Training parameters:
@@ -29,9 +29,9 @@ opt = lapp [[
   -d,--learningRateDecay  (default 1e-9)     learning rate decay
   -w,--weightDecay        (default 0)        L2 penalty on the weights
   -m,--momentum           (default 0.9)      momentum parameter
-  --batchSize             (default 64)       batch size for training
-  --maxMemory             (default 0.5e3)    Experience Replay buffer memory
-  --epochs                (default 1e3)      number of training steps to perform
+  --batchSize             (default 32)       batch size for training
+  --maxMemory             (default 1e3)      Experience Replay buffer memory
+  --epochs                (default 1e4)      number of training steps to perform
   
   Model parameters:
   --modelType             (default 'mlp')    neural net model type: cnn, mlp
@@ -49,6 +49,7 @@ torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
+print('Playing Catch game with Q-learning and mlp/cnn\n')
 
 local epsilon = opt.epsilon
 local nbActions = opt.nbActions
@@ -133,7 +134,7 @@ if opt.modelType == 'mlp' then
     model:add(nn.Linear(opt.nHidden, nbActions))
     -- test:
     local retvt = model:forward(torch.Tensor(nbStates))
-    print('test model:', retvt)
+    -- print('test model:', retvt)
 elseif opt.modelType == 'cnn' then
     model:add(nn.View(1, opt.gridSize, opt.gridSize))
     model:add(nn.SpatialConvolution(1, 32, 4,4, 2,2))
@@ -144,7 +145,7 @@ elseif opt.modelType == 'cnn' then
     model:add(nn.Linear(opt.nHidden, nbActions))
     -- test:
     local retvt = model:forward(torch.Tensor(gridSize, gridSize))
-    print('test model:', retvt)
+    -- print('test model:', retvt)
 else
     print('model type not recognized')
 end
@@ -219,8 +220,8 @@ for game = 1, opt.epochs do
         end
     end
     if game%opt.progFreq == 0 then 
-        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Win count: %d, Accuracy: %.2f, time [ms]: %d", 
-                             game,   epsilon,  err/opt.progFreq, randomActions/opt.progFreq,  winCount,  winCount/opt.progFreq, sys.toc()*1000))
+        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d", 
+                             game, epsilon, err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
         winCount = 0
         err = 0 
         randomActions = 0
