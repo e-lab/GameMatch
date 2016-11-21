@@ -34,7 +34,9 @@ opt = lapp [[
   --batchSize             (default 64)         batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --epochs                (default 1e4)       number of training steps to perform
-  
+  --useGPU                                    use GPU in training
+  --gpuId                 (default 1)         which GPU to use
+
   Model parameters:
   --fw                                        Use FastWeights or not
   --nLayers               (default 1)         RNN layers
@@ -97,6 +99,7 @@ local function Memory(maxMemory, discount)
             inputs[i] = memory[randomIndex].states:float() -- save as byte, use as float
             targets[i]= memory[randomIndex].actions:float()
         end
+        if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
 
         return inputs, targets
     end
@@ -122,6 +125,7 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
         inputs = {inputs, table.unpack(state)} -- attach states
         local out = model:forward(inputs)
         local predictions = torch.Tensor(nSeq, opt.batchSize, nbActions)
+        if opt.useGPU then predictions = predictions:cuda() end
         -- create table of outputs:
         for i = 1, nSeq do
             predictions[i] = out[i]
@@ -160,12 +164,25 @@ else
   model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
 end
 
+-- Mean Squared Error for our loss function.
+local criterion = nn.MSECriterion()
+
+-- use GPU, if desired:
+if opt.useGPU then
+  require 'cunn'
+  require 'cutorch'
+  cutorch.setDevice(opt.gpuId)
+  model:cuda()
+  prototype:cuda()
+  criterion:cuda()
+  print('Using GPU number', opt.gpuId)
+end
+
 -- Default RNN intial state set to zero:
 for l = 1, opt.nLayers do
    RNNh0Batch[l] = torch.zeros(opt.batchSize, opt.nHidden)
-   -- RNNhBatch[l] = torch.zeros(opt.batchSize, opt.nHidden)
    RNNh0Proto[l] = torch.zeros(1, opt.nHidden) -- prototype forward does not work on batches
-   -- RNNhProto[l] = torch.zeros(1, opt.nHidden)
+   if opt.useGPU then RNNh0Batch[l]=RNNh0Batch[l]:cuda() RNNh0Proto[l]=RNNh0Proto[l]:cuda() end
 end
 
 -- Params for Stochastic Gradient Descent (our optimizer).
@@ -178,20 +195,20 @@ local sgdParams = {
     nesterov = true
 }
 
--- Mean Squared Error for our loss function.
-local criterion = nn.MSECriterion()
-
 
 -- test model:
--- print('Testing model and prototype RNN:')
--- local ttest = {torch.Tensor(1, nbStates), torch.Tensor(1, opt.nHidden)}
--- print(ttest)
--- local a = prototype:forward(ttest)
--- print('TEST prototype:', a)
--- local ttest = {torch.Tensor(opt.batchSize, nSeq, nbStates), torch.Tensor(opt.batchSize, opt.nHidden)}
--- print(ttest)
--- local a = model:forward(ttest)
--- print('TEST model:', a)
+print('Testing model and prototype RNN:')
+local ttest 
+if opt.useGPU then ttest = {torch.CudaTensor(1, nbStates), torch.CudaTensor(1, opt.nHidden)}
+else ttest = {torch.Tensor(1, nbStates), torch.Tensor(1, opt.nHidden)} end
+print(ttest)
+local a = prototype:forward(ttest)
+print('TEST prototype:', a)
+if opt.useGPU then ttest = {torch.CudaTensor(opt.batchSize, nSeq, nbStates), torch.CudaTensor(opt.batchSize, opt.nHidden)}
+else ttest = {torch.Tensor(opt.batchSize, nSeq, nbStates), torch.Tensor(opt.batchSize, opt.nHidden)} end
+print(ttest)
+local a = model:forward(ttest)
+print('TEST model:', a)
 
 
 local gameEnv = CatchEnvironment(opt.gridSize) -- init game engine
@@ -221,6 +238,8 @@ for game = 1, opt.epochs do
     while not isGameOver do
         steps = steps+1 -- count game steps
         local action, q
+        if opt.useGPU then currentState = currentState:cuda() end
+        -- print(currentState:view(1, nbStates), RNNhProto)
         q = prototype:forward({currentState:view(1, nbStates), RNNhProto}) -- Forward the current state through the network.
         RNNhProto = q[1]
         -- Decides if we should choose a random action, or an action from the policy network.
@@ -233,6 +252,7 @@ for game = 1, opt.epochs do
             action = index[1]
         end
         -- store to memory
+        if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
         seqMem[steps] = currentState -- store state sequence into memory
         seqAct[steps][action] = 1
         local nextState, reward, gameOver = gameEnv.act(action)
