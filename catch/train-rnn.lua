@@ -290,8 +290,7 @@ for game = 1, opt.epochs do
         err = 0 
         randomActions = 0
     end
-    -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
-    if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
+    if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
 end
 torch.save(opt.savedir.."/catch-model-rnn.net", prototype:clearState())
 print("Model saved!")
