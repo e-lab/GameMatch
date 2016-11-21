@@ -14,12 +14,12 @@ require 'image'
 require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
+
   Game options:
   --gridSize            (default 20)          game grid size 
   --discount            (default 0.9)         discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
-  --nbActions           (default 0)           game number of actions
   --playFile            (default '')          human play file to initialize exp. replay memory
   --framework           (default 'alewrap')         name of training framework
   --env                 (default 'breakout')        name of environment to use')
@@ -37,10 +37,12 @@ opt = lapp [[
   -d,--learningRateDecay  (default 1e-9)      learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --batchSize             (default 1)         batch size for training
+  --batchSize             (default 64)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
-  --epoch                 (default 1e5)       number of training steps to perform
-  
+  --epochs                (default 1e5)       number of training steps to perform
+  --useGPU                                    use GPU in training
+  --gpuId                 (default 1)         which GPU to use
+
   Model parameters:
   --fw                                        Use FastWeights or not
   --nLayers               (default 1)         RNN layers
@@ -74,19 +76,10 @@ torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
 local gameEnv, gameActions, agent, opt = setup(opt) -- setup game environment
--- print(gameActions)
+print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
-local epsilon = opt.epsilon
-local epsilonMinimumValue = opt.epsilonMinimumValue
-local epoch = opt.epoch
-local hiddenSize = opt.hiddenSize
-local maxMemory = opt.maxMemory
-local batchSize = opt.batchSize
-local gridSize = opt.gridSize
-local nbStates = gridSize * gridSize
-local discount = opt.discount
-local nSeq = 4*gridSize -- RNN max sequence length in this game is grid size
-
+local nbStates = opt.gridSize * opt.gridSize
+local nSeq = 4*opt.gridSize -- RNN max sequence length in this game is grid size
 
 -- memory for experience replay:
 local function Memory(maxMemory, discount)
@@ -103,7 +96,7 @@ local function Memory(maxMemory, discount)
     -- Appends the experience to the memory.
     function memory.remember(memoryInput)
         table.insert(memory, memoryInput)
-        if (#memory > maxMemory) then
+        if (#memory > opt.maxMemory) then
             -- Remove the earliest memory to allocate new experience to memory.
             table.remove(memory, 1)
         end
@@ -115,8 +108,8 @@ local function Memory(maxMemory, discount)
         local memoryLength = #memory
         local chosenBatchSize = math.min(batchSize, memoryLength)
 
-        local inputs = torch.Tensor(chosenBatchSize, nSeq, nbStates)
-        local targets = torch.zeros(chosenBatchSize, nSeq, nbActions)
+        local inputs = torch.zeros(batchSize, nSeq, nbStates)
+        local targets = torch.zeros(batchSize, nSeq, nbActions)
 
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
@@ -124,6 +117,7 @@ local function Memory(maxMemory, discount)
             inputs[i] = memory[randomIndex].states:float() -- save as byte, use as float
             targets[i]= memory[randomIndex].actions:float()
         end
+        if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
 
         return inputs, targets
     end
@@ -133,10 +127,10 @@ end
 
 -- Converts input tensor into table of dimension equal to first dimension of input tensor
 -- and adds padding of zeros, which in this case are states
-local function tensor2Table(inputTensor, padding)
+local function tensor2Table(inputTensor, padding, state)
    local outputTable = {}
    for t = 1, inputTensor:size(1) do outputTable[t] = inputTensor[t] end
-   for l = 1, padding do outputTable[l + inputTensor:size(1)] = h0[l]:clone() end
+   for l = 1, padding do outputTable[l + inputTensor:size(1)] = state[l]:clone() end
    return outputTable
 end
 
@@ -144,46 +138,71 @@ end
 local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     local loss = 0
     local x, gradParameters = model:getParameters()
+    
     local function feval(x_new)
         gradParameters:zero()
-        local out = model:forward( {inputs:squeeze(), table.unpack(state)} )
-        local predictions = torch.Tensor(nSeq, nbActions)
+        inputs = {inputs, table.unpack(state)} -- attach states
+        local out = model:forward(inputs)
+        local predictions = torch.Tensor(nSeq, opt.batchSize, nbActions)
+        if opt.useGPU then predictions = predictions:cuda() end
+        -- create table of outputs:
         for i = 1, nSeq do
             predictions[i] = out[i]
         end
-        local loss = criterion:forward(predictions, targets:squeeze())
+        predictions = predictions:transpose(2,1)
+        -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
+        local loss = criterion:forward(predictions, targets)
         local grOut = criterion:backward(predictions, targets)
-        local gradOutput = tensor2Table(grOut,0)
-        gradOutput[#gradOutput+1] = state[1]
-        model:backward(inputs:squeeze(), gradOutput)
+        grOut = grOut:transpose(2,1)
+        local gradOutput = tensor2Table(grOut, 1, state)
+        model:backward(inputs, gradOutput)
         return loss, gradParameters
     end
 
     local _, fs = optim.sgd(feval, x, sgdParams)
+    
     loss = loss + fs[1]
     return loss
 end
 
 -- Create the base RNN model:
 local model, prototype
-local RNNh0 = {} -- initial state
-local RNNh = {} -- state to loop through prototype in inference
+local RNNh0Batch = {} -- initial state for training batches
+local RNNh0Proto = {} -- initial state - prototype
+local RNNhProto = {} -- state to loop through prototype in inference
 
 if opt.fw then
   print('Created fast-weights RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
-    '\n- layers:', opt.nLayers, '\n- output size:',  nbActions, '\n- sequence length:', nSeq, 
+    '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence length:', nSeq, 
     '\n- fast weights states:', opt.nFW)
   model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq, opt.nFW)
 else
   print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
-      '\n- layers:', opt.nLayers, '\n- output size:',  nbActions, '\n- sequence lenght:',  nSeq)
+      '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence lenght:',  nSeq)
   model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
+end
+
+-- Mean Squared Error for our loss function.
+local criterion = nn.MSECriterion()
+
+-- use GPU, if desired:
+if opt.useGPU then
+  require 'cunn'
+  require 'cutorch'
+  cutorch.setDevice(opt.gpuId)
+  local firstRandInt = torch.random()
+  cutorch.manualSeed(firstRandInt) -- set cuda random seed
+  model = model:cuda()
+  prototype = prototype:cuda()
+  criterion = criterion:cuda()
+  print('Using GPU number', opt.gpuId)
 end
 
 -- Default RNN intial state set to zero:
 for l = 1, opt.nLayers do
-   RNNh0[l] = torch.zeros(opt.nHidden)
-   RNNh[l] = torch.zeros(opt.nHidden)
+   RNNh0Batch[l] = torch.zeros(opt.batchSize, opt.nHidden)
+   RNNh0Proto[l] = torch.zeros(1, opt.nHidden) -- prototype forward does not work on batches
+   if opt.useGPU then RNNh0Batch[l]=RNNh0Batch[l]:cuda() RNNh0Proto[l]=RNNh0Proto[l]:cuda() end
 end
 
 -- Params for Stochastic Gradient Descent (our optimizer).
@@ -196,15 +215,32 @@ local sgdParams = {
     nesterov = true
 }
 
--- Mean Squared Error for our loss function.
-local criterion = nn.MSECriterion()
+
+-- test model:
+print('Testing model and prototype RNN:')
+local ttest 
+if opt.useGPU then ttest = {torch.CudaTensor(1, nbStates), torch.CudaTensor(1, opt.nHidden)}
+else ttest = {torch.Tensor(1, nbStates), torch.Tensor(1, opt.nHidden)} end
+-- print(ttest)
+local a = prototype:forward(ttest)
+-- print('TEST prototype:', a)
+if opt.useGPU then ttest = {torch.CudaTensor(opt.batchSize, nSeq, nbStates), torch.CudaTensor(opt.batchSize, opt.nHidden)}
+else ttest = {torch.Tensor(opt.batchSize, nSeq, nbStates), torch.Tensor(opt.batchSize, opt.nHidden)} end
+-- print(ttest)
+local a = model:forward(ttest)
+-- print('TEST model:', a)
+
 
 -- local gameEnv = CatchEnvironment(gridSize)
 local memory = Memory(maxMemory, discount)
 local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
-local epsUpdate = (epsilon - epsilonMinimumValue)/epoch
+local epsilon = opt.epsilon -- this will change in the training, so we copy it
+local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
+local err = 0
+local randomActions = 0
+
 
 function preProcess(im)
   local net = nn.SpatialMaxPooling(4,4,4,4)
@@ -216,41 +252,42 @@ function preProcess(im)
 end
 
 print('Begin training:')
-for game = 1, epoch do
+for game = 1, opt.epochs do
     sys.tic()
-    -- Initialise the environment.
-    local err = 0
     local steps = 0 -- counts steps to game win
+    
+    -- Initialise the environment.
     local screen, reward, gameOver = gameEnv:nextRandomGame()
-    local currentState = preProcess(screen):view(1,-1) -- resize to smaller size
+    local currentState = preProcess(screen) -- resize to smaller size
     local isGameOver = false
-
     -- reset RNN to intial state:
-    RNNh = table.unpack(RNNh0)
-
+    RNNhProto = table.unpack(RNNh0Proto)
+    
     while not isGameOver do
-        steps = steps+1
-        local action, q
-        q = prototype:forward({currentState, RNNh}) -- Forward the current state through the network.
-        RNNh = q[1]
+        steps = steps + 1 -- count game steps
+        local action
+        if opt.useGPU then currentState = currentState:cuda() end
+        local q = prototype:forward({currentState:view(1, nbStates), RNNhProto}) -- Forward the current state through the network.
+        RNNhProto = q[1]
         -- Decides if we should choose a random action, or an action from the policy network.
         if torch.uniform() < epsilon then
             action = torch.random(1, nbActions)
-            -- print(action)
+            randomActions = randomActions + 1
         else
             -- Find the max index (the chosen action).
-            local max, index = torch.max(q[2], 1) -- [2] is the output, [1] is state...
+            local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is state...
             action = index[1]
         end
         -- store to memory (but be careful to avoid larger than max seq: nSeq)
+        if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
         if steps < nSeq then
           seqMem[steps] = currentState -- store state sequence into memory
           seqAct[steps][action] = 1
         end
         
-        screen, reward, gameOver = gameEnv:step(gameActions[action], true)
-        
-        local nextState = preProcess(screen):view(1,-1) -- resize to smaller size
+        screen, reward, gameOver = gameEnv:step(gameActions[action], true) 
+        local nextState = preProcess(screen)
+
         if (reward == 1) then 
             winCount = winCount + 1 
             memory.remember({
@@ -258,9 +295,10 @@ for game = 1, epoch do
                 actions = seqAct:byte()
             })
             -- We get a batch of training data to train the model.
-            local inputs, targets = memory.getBatch(batchSize, nbActions, nbStates)
+            local inputs, targets = memory.getBatch(opt.batchSize, nbActions, nbStates)
             -- Train the network which returns the error.
-            err = err + trainNetwork(model, RNNh0, inputs, targets, criterion, sgdParams)
+            err = err + trainNetwork(model, RNNh0Batch, inputs, targets, criterion, sgdParams)
+            break
         end
         -- Update the current state and if the game is over.
         currentState = nextState
@@ -275,12 +313,13 @@ for game = 1, epoch do
     steps = 0 -- resetting step count (which is always grdiSize-2 anyway...)
 
     if game%opt.progFreq == 0 then 
-        print(string.format("Game %d, epsilon %.2f, err = %.4f, Win count %d, Accuracy: %.2f, time [ms]: %d", 
-                             game,    epsilon,      err,        winCount,     winCount/opt.progFreq, sys.toc()*1000))
+        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d", 
+                             game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
         winCount = 0
+        err = 0 
+        randomActions = 0
     end
-    -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
-    if epsilon > epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
+    if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
 end
 torch.save(opt.savedir.."/model-rnn.net", prototype:clearState())
 print("Model saved!")
