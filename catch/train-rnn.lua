@@ -26,7 +26,7 @@ opt = lapp [[
 
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
-  --seed                  (default 666)       initial random seed
+  --seed                  (default 1)         initial random seed
   -r,--learningRate       (default 0.1)       learning rate
   -d,--learningRateDecay  (default 1e-9)      learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
@@ -90,7 +90,7 @@ local function Memory(maxMemory, discount)
         local memoryLength = #memory
         local chosenBatchSize = math.min(batchSize, memoryLength)
 
-        local inputs = torch.Tensor(batchSize, nSeq, nbStates)
+        local inputs = torch.zeros(batchSize, nSeq, nbStates)
         local targets = torch.zeros(batchSize, nSeq, nbActions)
 
         -- create inputs and targets:
@@ -120,6 +120,7 @@ end
 local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     local loss = 0
     local x, gradParameters = model:getParameters()
+    
     local function feval(x_new)
         gradParameters:zero()
         inputs = {inputs, table.unpack(state)} -- attach states
