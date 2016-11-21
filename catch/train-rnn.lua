@@ -126,14 +126,12 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
         for i = 1, nSeq do
             predictions[i] = out[i]
         end
-        predictions=predictions:transpose(2,1)
-        -- print('in, outs:', inputs, out)
-        -- print('targets', {targets})
-        -- print('predictions', {predictions})
+        predictions = predictions:transpose(2,1)
+        -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
         local loss = criterion:forward(predictions, targets)
         local grOut = criterion:backward(predictions, targets)
         grOut = grOut:transpose(2,1)
-        local gradOutput = tensor2Table(grOut,1,state)
+        local gradOutput = tensor2Table(grOut, 1, state)
         model:backward(inputs, gradOutput)
         return loss, gradParameters
     end
