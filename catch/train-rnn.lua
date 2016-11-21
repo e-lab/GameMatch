@@ -31,7 +31,7 @@ opt = lapp [[
   -d,--learningRateDecay  (default 1e-9)      learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
-  --batchSize             (default 64)         batch size for training
+  --batchSize             (default 64)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --epochs                (default 1e4)       number of training steps to perform
   --useGPU                                    use GPU in training
@@ -150,7 +150,6 @@ end
 -- Create the base RNN model:
 local model, prototype
 local RNNh0Batch = {} -- initial state
-local RNNhBatch = {} -- state to loop through model in inference
 local RNNh0Proto = {} -- initial state - prototype
 local RNNhProto = {} -- state to loop through prototype in inference
 
@@ -216,7 +215,7 @@ print('TEST model:', a)
 
 local gameEnv = CatchEnvironment(opt.gridSize) -- init game engine
 local memory = Memory(maxMemory, discount)
-local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
+local seqMem = torch.zeros(nSeq, nbStates) -- store sequence of states in successful run
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
@@ -228,6 +227,7 @@ print('Begin training:')
 for game = 1, opt.epochs do
     sys.tic()
     local steps = 0 -- counts steps to game win
+    
     -- Initialise the environment.
     gameEnv.reset()
     local isGameOver = false
@@ -239,7 +239,7 @@ for game = 1, opt.epochs do
     RNNhProto = table.unpack(RNNh0Proto)
 
     while not isGameOver do
-        steps = steps+1 -- count game steps
+        steps = steps + 1 -- count game steps
         local action, q
         if opt.useGPU then currentState = currentState:cuda() end
         -- print(currentState:view(1, nbStates), RNNhProto)
@@ -258,7 +258,9 @@ for game = 1, opt.epochs do
         if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
         seqMem[steps] = currentState -- store state sequence into memory
         seqAct[steps][action] = 1
+        
         local nextState, reward, gameOver = gameEnv.act(action)
+        
         if (reward == 1) then 
             winCount = winCount + 1 
             memory.remember({
