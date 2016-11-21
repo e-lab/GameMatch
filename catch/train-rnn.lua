@@ -33,7 +33,7 @@ opt = lapp [[
   -m,--momentum           (default 0.9)       momentum parameter
   --batchSize             (default 64)         batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
-  --epochs                (default 1e5)       number of training steps to perform
+  --epochs                (default 1e4)       number of training steps to perform
   
   Model parameters:
   --fw                                        Use FastWeights or not
@@ -106,10 +106,10 @@ end
 
 -- Converts input tensor into table of dimension equal to first dimension of input tensor
 -- and adds padding of zeros, which in this case are states
-local function tensor2Table(inputTensor, padding)
+local function tensor2Table(inputTensor, padding, state)
    local outputTable = {}
    for t = 1, inputTensor:size(1) do outputTable[t] = inputTensor[t] end
-   for l = 1, padding do outputTable[l + inputTensor:size(1)] = h0[l]:clone() end
+   for l = 1, padding do outputTable[l + inputTensor:size(1)] = state[l]:clone() end
    return outputTable
 end
 
@@ -118,7 +118,6 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     local loss = 0
     local x, gradParameters = model:getParameters()
     local function feval(x_new)
-        -- print('\nTRAIN STEP:')
         gradParameters:zero()
         inputs = {inputs, table.unpack(state)} -- attach states
         local out = model:forward(inputs)
@@ -128,17 +127,13 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
             predictions[i] = out[i]
         end
         predictions=predictions:transpose(2,1)
-        -- print('in,outs:',inputs,out)
-        -- print('targets',{targets})
-        -- print('predicitons',{predictions})
+        -- print('in, outs:', inputs, out)
+        -- print('targets', {targets})
+        -- print('predictions', {predictions})
         local loss = criterion:forward(predictions, targets)
         local grOut = criterion:backward(predictions, targets)
         grOut = grOut:transpose(2,1)
-        -- print('grout', {grOut})
-        local gradOutput = tensor2Table(grOut,0)
-
-        gradOutput[#gradOutput+1] = state
-        -- print('gradout',gradOutput)
+        local gradOutput = tensor2Table(grOut,1,state)
         model:backward(inputs, gradOutput)
         return loss, gradParameters
     end
@@ -190,15 +185,15 @@ local criterion = nn.MSECriterion()
 
 
 -- test model:
-print('Testing model and prototype RNN:')
-local ttest = {torch.Tensor(1, nbStates), torch.Tensor(1, opt.nHidden)}
-print(ttest)
-local a = prototype:forward(ttest)
-print('TEST prototype:', a)
-local ttest = {torch.Tensor(opt.batchSize, nSeq, nbStates), torch.Tensor(opt.batchSize, opt.nHidden)}
-print(ttest)
-local a = model:forward(ttest)
-print('TEST model:', a)
+-- print('Testing model and prototype RNN:')
+-- local ttest = {torch.Tensor(1, nbStates), torch.Tensor(1, opt.nHidden)}
+-- print(ttest)
+-- local a = prototype:forward(ttest)
+-- print('TEST prototype:', a)
+-- local ttest = {torch.Tensor(opt.batchSize, nSeq, nbStates), torch.Tensor(opt.batchSize, opt.nHidden)}
+-- print(ttest)
+-- local a = model:forward(ttest)
+-- print('TEST model:', a)
 
 
 local gameEnv = CatchEnvironment(opt.gridSize) -- init game engine
