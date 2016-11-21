@@ -172,9 +172,11 @@ if opt.useGPU then
   require 'cunn'
   require 'cutorch'
   cutorch.setDevice(opt.gpuId)
-  model:cuda()
-  prototype:cuda()
-  criterion:cuda()
+  local firstRandInt = torch.random()
+  cutorch.manualSeed(firstRandInt) -- set cuda random seed
+  model = model:cuda()
+  prototype = prototype:cuda()
+  criterion = criterion:cuda()
   print('Using GPU number', opt.gpuId)
 end
 
