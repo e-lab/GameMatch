@@ -4,12 +4,20 @@ require 'convRNN'
 require 'nn'
 nngraph.setDebug(true)
 local model = {}
+function linear(och, h, w, action)
+   local x = nn.Identity()()
+   local out = x - nn.View(och*w*h) - nn.Linear(och*h*w, action)
+   return nn.gModule({x}, {out})
+end
 function model:getModel(ich, och, nHL, K, seq, nFW, w, h, action)
    local cr = convRNN(ich, och, 3, 3, 1, 1, nHL)
+   local li = linear(och,h,w,action)
 
    local clones = {}
+   local lclones = {}
    for i = 1, seq do
       clones[i] = cr:clone('weight', 'bias', 'gradWeight', 'gradBias')
+      lclones[i] = li:clone('weight','bias','gradWeight','gradBias')
    end
 
    local input = nn.Identity()()
@@ -22,7 +30,7 @@ function model:getModel(ich, och, nHL, K, seq, nFW, w, h, action)
       table.insert(H, H0[l])
    end
 
-   local splitInput = input - nn.SplitTable(1)
+   local splitInput = input - nn.SplitTable(2)
 
    for i = 1, seq do
       local x = splitInput - nn.SelectTable(i,i)
@@ -41,16 +49,17 @@ function model:getModel(ich, och, nHL, K, seq, nFW, w, h, action)
       end
       --Extract output per seq
       if nHL ~= 1 then
-         outputs[i] = tmpSta - nn.SelectTable(nHL , nHL ) - nn.View(och*w*h) - nn.Linear(och*w*h,action)
+         outputs[i] = tmpSta - nn.SelectTable(nHL , nHL )  - lclones[i]
       else
-         outputs[i] = tmpSta - nn.Identity() - nn.View(och*w*h) - nn.Linear(och*w*h,action)
+         outputs[i] = tmpSta - nn.Identity() - lclones[i]
       end
 
    end
-
+   --Get final hidden state
+   outputs[#outputs+1] = H[#H]
    local g = nn.gModule({input, table.unpack(H0)}, outputs)
 
-   return g, clones[1]
+   return g, clones[1], lclones[1]
 end
 
 return model

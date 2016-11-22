@@ -5,7 +5,7 @@ require 'nn'
 require 'cunn'
 require 'cudnn'
 require 'nngraph'
-nngraph.setDebug(true)
+--nngraph.setDebug(true)
 
 local backend = nn
 local scNB = backend.SpatialConvolution:noBias()
