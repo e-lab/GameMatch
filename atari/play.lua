@@ -1,5 +1,5 @@
 -- Eugenio Culurciello
--- October 2016
+-- November 2016
 
 require 'qtwidget' -- for keyboard interaction
 if not dqn then
