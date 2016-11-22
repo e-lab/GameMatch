@@ -84,7 +84,7 @@ end
 
 function autoPlay(state) -- plays automatically breakout so we do not have to
   local action, hstate, xball, xpaddle
-              win2 = image.display({image=state, zoom=8, win=win2})
+  -- win2 = image.display({image=state, zoom=8, win=win2}) -- debug
   hstate = state:size(2) -- 2 is Y, 3 is X
   _,xball = torch.max( state[{{1},{1,hstate-1},{}}]:sum(2), 3)
   xball = xball[1][1][1]
@@ -120,6 +120,7 @@ local steps = 0 -- count steps to game win
 function main()
   if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
   steps = steps+1
+  
   -- look at screen:
   win = image.display({image=screen, zoom=opt.zoom, win=win})
 
