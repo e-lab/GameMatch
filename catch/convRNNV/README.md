@@ -3,20 +3,18 @@
 - To test run
 
 ```
-sh run.sh
+th testRNNconv.lua
 ```
 ##Explanation
 
-- ich : input channel
-- och : output channel
-- seq : number of seq
-- nFW : fast weight not supported
-- w   : width
-- h   : hight
-- action : number of action
+- n : input channel
+- d : output channel
+- nHL : number of layer
+- T : number of seq
+- nFW : number of fastWeight
 
 Embed fully connected layer to map 3D to 1D action
 
 ```
-gm:getModel(ich, och, nHL, K, seq, nFW, w, h , action)
+gm.getModel(n, d, nHL, K, T, nFW)
 ```
