@@ -88,6 +88,7 @@ local function Memory(maxMemory, discount)
     if opt.playFile ~= '' then
         memory = torch.load(opt.playFile)
         print('Loaded experience replay memory with play file:', opt.playFile)
+        opt.maxMemory = #memory -- resize this to loaded file
     else
         memory = {}
         print('Initialized empty experience replay memory')
