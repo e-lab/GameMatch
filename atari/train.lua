@@ -1,9 +1,6 @@
 -- Eugenio Culurciello
 -- October 2016
--- Deep Q learning code
--- an implementation of: http://www.nature.com/nature/journal/v518/n7540/full/nature14236.html
--- inspired by: http://outlace.com/Reinforcement-Learning-Part-3/
--- or: https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
+-- Deep RNN for reinforcement online learning
 --
 -- new RNN version!
 
