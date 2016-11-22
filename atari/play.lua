@@ -24,7 +24,8 @@ opt = lapp [[
   --pool_frms_size      (default '1')               pool inputs frames size
   --actrep              (default 4)                 how many times to repeat action, frames to skip to speed up game and inference
   --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
- 
+  --autoPlay                                        automatic play game to same human time!
+
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
@@ -81,6 +82,25 @@ function preProcess(im)
   return out
 end
 
+function autoPlay(state) -- plays automatically breakout so we do not have to
+  local action, hstate, xball, xpaddle
+              win2 = image.display({image=state, zoom=8, win=win2})
+  hstate = state:size(2) -- 2 is Y, 3 is X
+  _,xball = torch.max( state[{{1},{1,hstate-1},{}}]:sum(2), 3)
+  xball = xball[1][1][1]
+  -- print('xball', xball)
+  _,xpaddle = torch.max( state[{{1},{hstate},{}}]:sum(2), 3)
+  xpaddle = xpaddle[1][1][1]
+  -- print('xpaddle', xpaddle)
+  -- if math.abs(xball - xpaddle + 2) > 2 then
+    if xball > xpaddle then action = 3 else action = 4 end
+  -- else 
+    -- action = 2
+  -- end
+
+  return action
+end
+
 -- start a new game
 local screen, reward, isGameOver = gameEnv:newGame()
 local currentState = preProcess(screen) -- resize to smaller size
@@ -104,9 +124,9 @@ function main()
   win = image.display({image=screen, zoom=opt.zoom, win=win})
 
   -- get human player move:
-  -- currentState, reward, isGameOver = gameEnv.act(action)
+  if steps > 1 and opt.autoPlay then action = autoPlay(currentState) end -- automatic play option
   screen, reward, isGameOver = gameEnv:step(gameActions[action], false)
-  local currentState = preProcess(screen) -- resize to smaller size
+  currentState = preProcess(screen) -- resize to smaller size
 
   -- store to memory
   seqMem[steps] = currentState:clone() -- store state sequence into memory
@@ -122,7 +142,7 @@ function main()
 
   if isGameOver then
     episodes = episodes + 1
-    gameEnv.reset()
+    gameEnv:newGame()
     isGameOver = false
     steps = 0
   end
@@ -130,7 +150,7 @@ end
 
 -- game controls for Breakout
 print('Game controls: left / right')
-qtimer.interval = 300
+if autoPlay then qtimer.interval = 0 else qtimer.interval = 60 end
 qtimer.singleShot = false
 qt.connect(qtimer,'timeout()', main)
 
