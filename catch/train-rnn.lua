@@ -261,7 +261,7 @@ for game = 1, opt.epochs do
         
         local nextState, reward, gameOver = gameEnv.act(action)
         
-        if (reward == 1) then 
+        if reward >= 1 then 
             winCount = winCount + 1 
             memory.remember({
                 states = seqMem:byte(), -- save as byte, use as float

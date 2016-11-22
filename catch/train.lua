@@ -196,7 +196,7 @@ for game = 1, opt.epochs do
         end
 
         local nextState, reward, gameOver = gameEnv.act(action)
-        if (reward == 1) then winCount = winCount + 1 end
+        if reward >= 1 then winCount = winCount + 1 end
         memory.remember({
             inputState = currentState,
             action = action,

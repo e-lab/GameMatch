@@ -257,12 +257,12 @@ for game = 1, opt.epochs do
     local isGameOver = false
     -- reset RNN to intial state:
     RNNhProto = table.unpack(RNNh0Proto)
-    
     while not isGameOver do
         if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
         steps = steps + 1 -- count game steps
         local action
         if opt.useGPU then currentState = currentState:cuda() end
+        prototype:forward({currentState:view(1, nbStates), table.unpack(RNNh0Proto)}) -- HAVE TO DO THIS to clear proto state, or crashes
         local q = prototype:forward({currentState:view(1, nbStates), RNNhProto}) -- Forward the current state through the network.
         RNNhProto = q[1]
         -- Decides if we should choose a random action, or an action from the policy network.
@@ -282,7 +282,7 @@ for game = 1, opt.epochs do
         screen, reward, gameOver = gameEnv:step(gameActions[action], true) 
         local nextState = preProcess(screen)
 
-        if (reward == 1) then 
+        if reward >= 1 then 
             winCount = winCount + 1 
             memory.remember({
                 states = seqMem:byte(), -- save as byte, use as float
@@ -292,9 +292,8 @@ for game = 1, opt.epochs do
             local inputs, targets = memory.getBatch(opt.batchSize, nbActions, nbStates)
             -- Train the network which returns the error.
             err = err + trainNetwork(model, RNNh0Batch, inputs, targets, criterion, sgdParams)
-            break
         end
-        -- Update the current state and if the game is over.
+        -- Update the current state and if the game is over:
         currentState = nextState
         isGameOver = gameOver
 
@@ -314,6 +313,7 @@ for game = 1, opt.epochs do
         randomActions = 0
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
+    if game%1 then collectgarbage() end
 end
 torch.save(opt.savedir.."/model-rnn.net", prototype:clearState())
 print("Model saved!")
