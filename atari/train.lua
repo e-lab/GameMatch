@@ -26,8 +26,8 @@ opt = lapp [[
   --game_path           (default 'roms/')           path to environment file (ROM)
   --env_params          (default 'useRGB=true')     string of environment parameters
   --pool_frms_type      (default 'max')             pool inputs frames mode
-  --pool_frms_size      (default '4')               pool inputs frames size
-  --actrep              (default 10)                 how many times to repeat action, frames to skip to speed up game and inference
+  --pool_frms_size      (default '1')               pool inputs frames size
+  --actrep              (default 4)                 how many times to repeat action, frames to skip to speed up game and inference
   --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
  
   Training parameters:

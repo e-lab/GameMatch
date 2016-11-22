@@ -98,7 +98,7 @@ local isGameOver = false
 local steps = 0 -- count steps to game win
 
 function main()
-  if steps >= nSeq then steps = 0 end
+  if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
   steps = steps+1
   -- look at screen:
   win = image.display({image=screen, zoom=opt.zoom, win=win})
