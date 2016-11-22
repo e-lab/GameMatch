@@ -264,6 +264,7 @@ for game = 1, opt.epochs do
     RNNhProto = table.unpack(RNNh0Proto)
     
     while not isGameOver do
+        if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
         steps = steps + 1 -- count game steps
         local action
         if opt.useGPU then currentState = currentState:cuda() end
@@ -280,10 +281,8 @@ for game = 1, opt.epochs do
         end
         -- store to memory (but be careful to avoid larger than max seq: nSeq)
         if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
-        if steps < nSeq then
-          seqMem[steps] = currentState -- store state sequence into memory
-          seqAct[steps][action] = 1
-        end
+        seqMem[steps] = currentState -- store state sequence into memory
+        seqAct[steps][action] = 1
         
         screen, reward, gameOver = gameEnv:step(gameActions[action], true) 
         local nextState = preProcess(screen)
