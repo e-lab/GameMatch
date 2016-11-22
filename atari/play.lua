@@ -37,7 +37,7 @@ opt = lapp [[
   --nFW                   (default 8)         number of fast weights previous vectors
 
   Display and save parameters:
-  --zoom                  (default 4)        zoom window
+  --zoom                  (default 1)        zoom window
   -v, --verbose           (default 2)        verbose output
   --display                                  display stuff
   --savedir          (default './results')   subdirectory to save experiments in
