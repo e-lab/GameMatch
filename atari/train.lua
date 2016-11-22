@@ -1,8 +1,6 @@
 -- Eugenio Culurciello
--- October 2016
+-- November 2016
 -- Deep RNN for reinforcement online learning
---
--- new RNN version!
 
 if not dqn then
     require "initenv"
