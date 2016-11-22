@@ -166,6 +166,26 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     return loss
 end
 
+function preProcess(im)
+  local net = nn.SpatialMaxPooling(4,4,4,4)
+  -- local pooled = net:forward(im[1])
+  local pooled = net:forward(im[1][{{},{94,194},{9,152}}])
+  -- print(pooled:size())
+  local out = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
+  return out
+end
+
+
+-- Params for Stochastic Gradient Descent (our optimizer).
+local sgdParams = {
+    learningRate = opt.learningRate,
+    learningRateDecay = opt.learningRateDecay,
+    weightDecay = opt.weightDecay,
+    momentum = opt.momentum,
+    dampening = 0,
+    nesterov = true
+}
+
 -- Create the base RNN model:
 local model, prototype
 local RNNh0Batch = {} -- initial state for training batches
@@ -206,17 +226,6 @@ for l = 1, opt.nLayers do
    if opt.useGPU then RNNh0Batch[l]=RNNh0Batch[l]:cuda() RNNh0Proto[l]=RNNh0Proto[l]:cuda() end
 end
 
--- Params for Stochastic Gradient Descent (our optimizer).
-local sgdParams = {
-    learningRate = opt.learningRate,
-    learningRateDecay = opt.learningRateDecay,
-    weightDecay = opt.weightDecay,
-    momentum = opt.momentum,
-    dampening = 0,
-    nesterov = true
-}
-
-
 -- test model:
 print('Testing model and prototype RNN:')
 local ttest 
@@ -232,7 +241,7 @@ local a = model:forward(ttest)
 -- print('TEST model:', a)
 
 
--- local gameEnv = CatchEnvironment(gridSize)
+-- setup memory and training variables:
 local memory = Memory(maxMemory, discount)
 local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
@@ -241,16 +250,6 @@ local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
 local err = 0
 local randomActions = 0
-
-
-function preProcess(im)
-  local net = nn.SpatialMaxPooling(4,4,4,4)
-  -- local pooled = net:forward(im[1])
-  local pooled = net:forward(im[1][{{},{94,194},{9,152}}])
-  -- print(pooled:size())
-  local out = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
-  return out
-end
 
 print('Begin training:')
 for game = 1, opt.epochs do
