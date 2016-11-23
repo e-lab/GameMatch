@@ -32,6 +32,7 @@ function FastWeights:updateOutput(input)
    -- fast weights update:
    for f = 1, self.nFW do -- 1 = most recent, nFW = most past
       local prod = self.prevOuts[f]:cmul(input)
+      -- Here previous 2D format was prod[1] replace with prod need to take a look later
       hSum = hSum + self.prevOuts[f]:clone():cmul(prod):mul(self.lambda^(f))
    end
    local nextH = self.eta * hSum
