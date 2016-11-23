@@ -228,6 +228,7 @@ for game = 1, opt.epochs do
     end
     -- Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end
+    collectgarbage()
 end
 torch.save(opt.savedir.."/catch-model.net", model)
 print("Model saved!")

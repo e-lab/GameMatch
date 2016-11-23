@@ -179,6 +179,7 @@ for game = 1, opt.epochs do
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
     accTime = math.ceil(accTime + sys.toc()*1000)
+    collectgarbage()
 end
 torch.save(paths.concat(opt.savedir,"/catch-model-convRnn.net"), prototype:clearState())
 print("Model saved!")

@@ -291,6 +291,7 @@ for game = 1, opt.epochs do
         randomActions = 0
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
+    collectgarbage()
 end
 torch.save(opt.savedir.."/catch-model-rnn.net", prototype:clearState())
 print("Model saved!")
