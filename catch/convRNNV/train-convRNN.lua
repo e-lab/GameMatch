@@ -181,5 +181,5 @@ for game = 1, opt.epochs do
     accTime = math.ceil(accTime + sys.toc()*1000)
     collectgarbage()
 end
-torch.save(opt.savedir.."/catch-model-convRNN.net"), prototype:clearState())
+torch.save(opt.savedir.."/catch-model-convRNN.net", prototype:clearState())
 print("Model saved!")
