@@ -4,7 +4,7 @@ opt = {}
 opt.fw = true
 gm = require 'RNNconv'
 
-n , d , nHL, K, T, nFW = 2, 4, 2, 1, 8, 3
+n , d , nHL, K, T, nFW = 4, 3, 3, 9, 8, 2
 w, h , action = 10 , 10 , 3
 batch = 64
 model, single = gm.getModel(n, d, nHL, K, T, nFW, batch, w, h)
