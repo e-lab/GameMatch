@@ -1,204 +1,177 @@
 -- Eugenio Culurciello
--- October 2016
+-- November 2016
 
--- gd = require "gd"
 require 'qtwidget' -- for keyboard interaction
-
 if not dqn then
-    require "initenvPlay"
+    require "initenv"
+end
+require 'image'
+require 'pl'
+lapp = require 'pl.lapp'
+opt = lapp [[
+
+  Game options:
+  --gridSize            (default 20)          game grid size 
+  --discount            (default 0.9)         discount factor in learning
+  --epsilon             (default 1)           initial value of ϵ-greedy action selection
+  --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
+  --playFile            (default '')          human play file to initialize exp. replay memory
+  --framework           (default 'alewrap')         name of training framework
+  --env                 (default 'breakout')        name of environment to use')
+  --game_path           (default 'roms/')           path to environment file (ROM)
+  --env_params          (default 'useRGB=true')     string of environment parameters
+  --pool_frms_type      (default 'max')             pool inputs frames mode
+  --pool_frms_size      (default '1')               pool inputs frames size
+  --actrep              (default 4)                 how many times to repeat action, frames to skip to speed up game and inference
+  --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
+  --autoPlay                                        automatic play game to same human time!
+
+  Training parameters:
+  --threads               (default 8)         number of threads used by BLAS routines
+  --seed                  (default 1)         initial random seed
+
+  Model parameters:
+  --fw                                        Use FastWeights or not
+  --nLayers               (default 1)         RNN layers
+  --nHidden               (default 128)       RNN hidden size
+  --nFW                   (default 8)         number of fast weights previous vectors
+
+  Display and save parameters:
+  --zoom                  (default 1)        zoom window
+  -v, --verbose           (default 2)        verbose output
+  --display                                  display stuff
+  --savedir          (default './results')   subdirectory to save experiments in
+  --progFreq              (default 1e2)       frequency of progress output
+]]
+
+local nbStates = opt.gridSize * opt.gridSize
+local nSeq = 4*opt.gridSize -- RNN max sequence length in this game is grid size
+
+-- format options:
+opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
+
+if opt.verbose >= 1 then
+    print('Using options:')
+    for k, v in pairs(opt) do
+        print(k, v)
+    end
 end
 
+package.path = '../catch/?.lua;' .. package.path
+local rnn = require 'RNN'
 
-local cmd = torch.CmdLine()
-cmd:text()
-cmd:text('Play video game:')
-cmd:text()
-cmd:text('Options:')
-
-cmd:option('-framework', 'alewrap', 'name of training framework')
-cmd:option('-env', 'breakout', 'name of environment to use')
-cmd:option('-game_path', 'roms/', 'path to environment file (ROM)')
-cmd:option('-env_params', 'useRGB=true', 'string of environment parameters')
-cmd:option('-pool_frms', 'max', 'string of frame pooling parameters (e.g.: size=2,type="max")')
-cmd:option('-actrep', 1, 'how many times to repeat action')
-cmd:option('-random_starts', 0, 'play action 0 between 1 and random_starts ' ..
-           'number of times at the start of each training episode')
-
-cmd:option('-name', '', 'filename used for saving network and training history')
-cmd:option('-network', '', 'reload pretrained network')
-cmd:option('-agent', '', 'name of agent file to use')
-cmd:option('-agent_params', '', 'string of agent parameters')
-cmd:option('-seed', 1, 'fixed input seed for repeatable experiments')
-
-cmd:option('-verbose', 2,
-           'the higher the level, the more information is printed to screen')
-cmd:option('-threads', 8, 'number of BLAS threads')
-cmd:option('-gpu', -1, 'gpu flag')
-cmd:option('-gif_file', '', 'GIF path to write session screens')
-cmd:option('-csv_file', '', 'CSV path to write session data')
---Frame option for size default is match with DeepMind Q learning
---Default img size is 3 x 210 x 160
-cmd:option('-zoom', '3', 'zoom window')
-cmd:option('-pool_frms_size',2,'frms_size')
-cmd:option('-poolfrms_type','\"max\"','frame option')
---Save frame info
-cmd:option('-saveImg',true,'Save image under frames')
-cmd:option('-filePath', 'save', 'filePath')
-cmd:option('-size',500,'iteration size')
-cmd:option('-seq',20,'seqence size')
-cmd:option('-freq',4,'Sample frequency size')
---Option for save
-cmd:text()
-
-local opt = cmd:parse(arg)
-
+torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
--- torch.manualSeed(opt.seed)
+torch.manualSeed(opt.seed)
+os.execute('mkdir '..opt.savedir)
+
+local gameEnv, gameActions, agent, opt = setup(opt) -- setup game environment
+print('Game started. Number of game actions:', #gameActions)
+local nbActions = #gameActions
+local nbStates = opt.gridSize * opt.gridSize
+local nSeq = 4*opt.gridSize -- RNN max sequence length in this game is grid size
 
 local qtimer = qt.QTimer()
 
---- General setup.
-local game_env, game_actions, agent, opt = setup(opt)
-
--- override print to always flush the output
-local old_print = print
-local print = function(...)
-    old_print(...)
-    io.flush()
+function preProcess(im)
+  local net = nn.SpatialMaxPooling(4,4,4,4)
+  -- local pooled = net:forward(im[1])
+  local pooled = net:forward(im[1][{{},{94,194},{9,152}}])
+  -- print(pooled:size())
+  local out = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
+  return out
 end
 
--- file names from command line
--- local gif_filename = opt.gif_file
+function autoPlay(state) -- plays automatically breakout so we do not have to
+  local action, hstate, xball, xpaddle
+  -- win2 = image.display({image=state, zoom=8, win=win2}) -- debug
+  hstate = state:size(2) -- 2 is Y, 3 is X
+  _,xball = torch.max( state[{{1},{1,hstate-1},{}}]:sum(2), 3)
+  xball = xball[1][1][1]
+  -- print('xball', xball)
+  _,xpaddle = torch.max( state[{{1},{hstate},{}}]:sum(2), 3)
+  xpaddle = xpaddle[1][1][1]
+  -- print('xpaddle', xpaddle)
+  -- if math.abs(xball - xpaddle + 2) > 2 then
+    if xball > xpaddle then action = 3 else action = 4 end
+  -- else 
+    -- action = 2
+  -- end
+
+  return action
+end
 
 -- start a new game
-local screen, reward, terminal = game_env:newGame()
-
--- compress screen to JPEG with 100% quality
--- local jpg = image.compressJPG(screen:squeeze(), 100)
--- create gd image from JPEG string
--- local im = gd.createFromJpegStr(jpg:storage():string())
--- convert truecolor to palette
--- im:trueColorToPalette(false, 256)
-
--- write GIF header, use global palette and infinite looping
--- im:gifAnimBegin(gif_filename, true, 0)
--- write first frame
--- im:gifAnimAdd(gif_filename, false, 0, 0, 7, gd.DISPOSAL_NONE)
-
--- remember the image and show it first
--- local previm = im
--- local win = image.display({image=screen})
+local screen, reward, isGameOver = gameEnv:newGame()
+local currentState = preProcess(screen) -- resize to smaller size
+local episodes, totalReward = 0, 0
 
 -- Create a window for displaying output frames
 win = qtwidget.newwindow(opt.zoom*screen:size(4), opt.zoom*screen:size(3),'EC game engine')
 
-local keyPress = 2
+local action = 2
+local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
+local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
+local memory = {} -- memory to save play data
 
-print("Started playing...")
+local isGameOver = false
+local steps = 0 -- count steps to game win
 
--- play one episode (game)
-frame  = 0
-file  = {}
-frames = {}
-save = true
---Get sampling option from opt
-filePath = opt.filePath
-size = opt.size
-seq     = opt.seq
-freq    = opt.freq
-maxFram = size*seq*freq
-container = torch.ByteTensor(size,seq,3,84,84):fill(0)
-collectgarbage()
 function main()
-    collectgarbage()
--- while not terminal do
-    -- if action was chosen randomly, Q-value is 0
-    -- agent.bestq = 0
+  if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
+  steps = steps+1
+  
+  -- look at screen:
+  win = image.display({image=screen, zoom=opt.zoom, win=win})
 
-    -- choose the best action
-    local action_index = keyPress --2+torch.random(2)
-    -- local action_index = agent:perceive(reward, screen, terminal, true, 0.05)
+  -- get human player move:
+  if steps > 1 and opt.autoPlay then action = autoPlay(currentState) end -- automatic play option
+  screen, reward, isGameOver = gameEnv:step(gameActions[action], false)
+  currentState = preProcess(screen) -- resize to smaller size
 
-    -- play game in test mode (episodes don't end when losing a life)
-    -- reward = score added, terminal = end of game (all lives gone)
-    collectgarbage()
-    --Stop saving option
-    if action_index == 1 or idx == size then save = false print('Stop sampling') end
-    if save then
-       screen, reward, terminal = game_env:step(game_actions[action_index], false)
-       -- display screen
-       image.display({image=screen, win=win, zoom=opt.zoom})
-       --Count frame number
-       frame = frame+1
-       print(frame)
-       --Save frame based on freq and seq and maxFrm
-       local flag = false
-       if frame ~= maxFram then
-       collectgarbage()
-          if frame % freq == 0 then
-             flag = true
-          elseif reward > 0 or action_index == 3 or action_index == 4 then
-             flag = true
-          end
-          if flag then
-             sampleFrame = math.floor(frame/freq)
-             idx    = math.floor(sampleFrame / seq) + 1
-             seqIdx = math.floor(sampleFrame % seq) + 1
-             print('idx: ' , idx)
-             print('seqIdx : ',seqIdx)
-             print('action_index :', action_index)
-             --Convert to byte
-             local byte = screen[1]*255
-             byte = byte:byte()
-             byte = image.scale(byte, 84, 84, 'bilinear')
-             if opt.saveImg then
-                imgName = './save/frames/'..tostring(idx)..'_'..tostring(seqIdx)..'.png'
-                image.save(imgName,byte)
-             end
-             container[idx][seqIdx] = byte
-             --Save reward and terminal along with screen
-             frames[seqIdx] = {action_index, reward, terminal}
-             --Save to table with seq
-             if sampleFrame %  seq == 0 then
-                file[idx-1] = frames
-                frames = {}
-             end
-          end
-       else
-          save = false
-       end
-    end
-    if not save then
-       print ('save frames')
-       torch.save(filePath..'/actionTable.t7',file)
-       torch.save(filePath..'/frameTensor.t7',container)
-       qt.disconnect(qtimer,'timeout()',main)
-    end
+  -- store to memory
+  seqMem[steps] = currentState:clone() -- store state sequence into memory
+  seqAct[steps][action] = 1
 
+  action = 2 -- stop move
+  
+  if reward == 1 then 
+    totalReward = totalReward + reward
+    print('Total Reward:', totalReward)
+    table.insert(memory, {states = seqMem:byte(), actions = seqAct:byte()}) -- insert successful sequence into data memory
+  end
+
+  if isGameOver then
+    episodes = episodes + 1
+    gameEnv:newGame()
+    isGameOver = false
+    steps = 0
+  end
 end
 
--- game controls
+-- game controls for Breakout
 print('Game controls: left / right')
-qtimer.interval = 30
+if autoPlay then qtimer.interval = 0 else qtimer.interval = 60 end
 qtimer.singleShot = false
 qt.connect(qtimer,'timeout()', main)
 
-local prevState = true
 qt.connect(win.listener,
          'sigKeyPress(QString, QByteArray, QByteArray)',
          function(_, keyValue)
             if keyValue == 'Key_Right' then
-                keyPress = 3
+                action = 3
             elseif keyValue == 'Key_Left' then
-                keyPress = 4
+                action = 4
             elseif keyValue == 'Key_X' then
-                keyPress = 1
+                action = 1
+            elseif keyValue == 'Key_Q' then
+                torch.save(opt.savedir .. '/play-memory.t7', memory)
+                print('Done playing!')
+                print('Episodes: ', episodes, 'total reward:', totalReward)
+                os.exit()
             else
-                keyPress = 2
+                action = 2
             end
             qtimer:start()
          end)
-qt.connect(win.listener,
-         'sigKeyRelease(QString, QByteArray, QByteArray)',
-         function(_, keyValue) keyPress = 2 end)
 qtimer:start()

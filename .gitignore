@@ -9,3 +9,11 @@
 *.eps
 
 *.model
+
+*.svg
+
+*.dot
+
+*.txt
+
+*.swo
