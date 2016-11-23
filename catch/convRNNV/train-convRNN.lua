@@ -1,4 +1,5 @@
 -- Eugenio Culurciello
+-- Sangpil Kim add convRNN
 -- October 2016
 -- learning with RNN
 
@@ -11,7 +12,7 @@ require 'nn'
 require 'image'
 require 'optim'
 require 'nngraph'
-require 'util'
+local logger = require 'util'
 require 'paths'
 local of = require 'opt'
 opt = of.parse(arg)
@@ -21,6 +22,9 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 convRNN = require 'RNNconv'
 os.execute('mkdir '..opt.savedir)
+torch.save(paths.concat(opt.savedir,'opt.t7'),opt)
+
+logger:__init(opt)
 print('Playing Catch game with RNN\n')
 
 local nbStates = opt.gridSize * opt.gridSize
@@ -82,7 +86,6 @@ local sgdParams = {
     nesterov = true
 }
 
-
 local ttest = {torch.Tensor(batch, nSeq, ch, wi, hi),
          torch.Tensor(batch, hCh, wi, hi)}
 -- test model:
@@ -101,8 +104,7 @@ local seqMem = torch.zeros(nSeq, nbStates) -- store sequence of states in succes
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
-local winCount = 0
-local err = 0
+local winCount, err, accTime = 0, 0, 0
 local randomActions = 0
 
 print('Begin training:')
@@ -168,11 +170,15 @@ for game = 1, opt.epochs do
     if game%opt.progFreq == 0 then
         print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
+        local acc = winCount / opt.progFreq
+        logger:write(acc)
+        logger:tbwrite(accTime, acc)
         winCount = 0
         err = 0
         randomActions = 0
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
+    accTime = math.ceil(accTime + sys.toc()*1000)
 end
-torch.save(opt.savedir.."/catch-model-convRnn.net", prototype:clearState())
+torch.save(paths.concat(opt.savedir,"/catch-model-convRnn.net"), prototype:clearState())
 print("Model saved!")

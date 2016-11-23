@@ -1,4 +1,17 @@
-
+local logger, parent = torch.class('logger','optim.Logger')
+function logger:__init(opt)
+   parent.__init(self)
+   self.gblogger = parent.new(paths.concat(opt.savedir,'pergame.log'))
+   self.gblogger:setNames{'accuracy'}
+   self.tblogger = parent.new(paths.concat(opt.savedir,'pertime.log'))
+   self.tblogger:setNames{'ms', 'accuracy'}
+end
+function logger:tbwrite(time, acc)
+   self.tblogger:add{time, acc}
+end
+function logger:write(acc)
+   self.gblogger:add{acc}
+end
 -- memory for experience replay:
 function Memory(maxMemory, discount)
     local memory
@@ -78,9 +91,10 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
         return loss, gradParameters
     end
 
-    local _, fs = optim.sgd(feval, x, sgdParams)
+    local _, fs = optim.adam(feval, x, sgdParams)
 
     loss = loss + fs[1]
     return loss
 end
 
+return logger
