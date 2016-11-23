@@ -15,9 +15,9 @@ require 'nngraph'
 require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
-  
+
   Game options:
-  --gridSize            (default 10)          game grid size 
+  --gridSize            (default 10)          game grid size
   --discount            (default 0.9)         discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.02)        final value of ϵ-greedy action selection
@@ -59,6 +59,23 @@ torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 print('Playing Catch game with RNN\n')
 
+-- add logger
+local logger, parent = torch.class('logger','optim.Logger')
+function logger:__init(opt)
+   parent.__init(self)
+   self.gblogger = parent.new(paths.concat(opt.savedir,'pergame.log'))
+   self.gblogger:setNames{'accuracy'}
+   self.tblogger = parent.new(paths.concat(opt.savedir,'pertime.log'))
+   self.tblogger:setNames{'ms', 'accuracy'}
+end
+function logger:tbwrite(time, acc)
+   self.tblogger:add{time, acc}
+end
+function logger:write(acc)
+   self.gblogger:add{acc}
+end
+logger:__init(opt)
+
 local nbStates = opt.gridSize * opt.gridSize
 local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
 local nbActions = opt.nbActions
@@ -74,7 +91,7 @@ local function Memory(maxMemory, discount)
         memory = {}
         print('Initialized empty experience replay memory')
     end
-    
+
     -- Appends the experience to the memory.
     function memory.remember(memoryInput)
         table.insert(memory, memoryInput)
@@ -120,7 +137,7 @@ end
 local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     local loss = 0
     local x, gradParameters = model:getParameters()
-    
+
     local function feval(x_new)
         gradParameters:zero()
         inputs = {inputs, table.unpack(state)} -- attach states
@@ -142,7 +159,7 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     end
 
     local _, fs = optim.sgd(feval, x, sgdParams)
-    
+
     loss = loss + fs[1]
     return loss
 end
@@ -154,12 +171,12 @@ local RNNh0Proto = {} -- initial state - prototype
 local RNNhProto = {} -- state to loop through prototype in inference
 
 if opt.fw then
-  print('Created fast-weights RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
-    '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence length:', nSeq, 
+  print('Created fast-weights RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden,
+    '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence length:', nSeq,
     '\n- fast weights states:', opt.nFW)
   model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq, opt.nFW)
 else
-  print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden, 
+  print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden,
       '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence lenght:',  nSeq)
   model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
 end
@@ -200,7 +217,7 @@ local sgdParams = {
 
 -- test model:
 print('Testing model and prototype RNN:')
-local ttest 
+local ttest
 if opt.useGPU then ttest = {torch.CudaTensor(1, nbStates), torch.CudaTensor(1, opt.nHidden)}
 else ttest = {torch.Tensor(1, nbStates), torch.Tensor(1, opt.nHidden)} end
 print(ttest)
@@ -222,12 +239,13 @@ local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
 local err = 0
 local randomActions = 0
+local accTime = 0
 
 print('Begin training:')
 for game = 1, opt.epochs do
     sys.tic()
     local steps = 0 -- counts steps to game win
-    
+
     -- Initialise the environment.
     gameEnv.reset()
     local isGameOver = false
@@ -258,11 +276,11 @@ for game = 1, opt.epochs do
         if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
         seqMem[steps] = currentState -- store state sequence into memory
         seqAct[steps][action] = 1
-        
+
         local nextState, reward, gameOver = gameEnv.act(action)
-        
-        if reward >= 1 then 
-            winCount = winCount + 1 
+
+        if reward >= 1 then
+            winCount = winCount + 1
             memory.remember({
                 states = seqMem:byte(), -- save as byte, use as float
                 actions = seqAct:byte()
@@ -276,21 +294,25 @@ for game = 1, opt.epochs do
         currentState = nextState
         isGameOver = gameOver
 
-        if opt.display then 
+        if opt.display then
             win = image.display({image=currentState:view(opt.gridSize,opt.gridSize), zoom=10, win=win})
         end
     end
     seqAct:zero()
     steps = 0 -- resetting step count (which is always grdiSize-2 anyway...)
 
-    if game%opt.progFreq == 0 then 
-        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d", 
+    if game%opt.progFreq == 0 then
+        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
+        local acc = winCount / opt.progFreq
+        logger:write(acc)
+        logger:tbwrite(accTime, acc)
         winCount = 0
-        err = 0 
+        err = 0
         randomActions = 0
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
+    accTime = math.ceil(accTime + sys.toc()*1000)
     collectgarbage()
 end
 torch.save(opt.savedir.."/catch-model-rnn.net", prototype:clearState())

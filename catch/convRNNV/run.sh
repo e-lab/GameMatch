@@ -1,3 +1,1 @@
-rm -rf *.dot
-rm -rf *.svg
-th testRNNconv.lua
+th train-convRNN.lua --useGPU --savedir sgdlr1e1
