@@ -91,7 +91,7 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
         return loss, gradParameters
     end
 
-    local _, fs = optim.adam(feval, x, sgdParams)
+    local _, fs = optim.sgd(feval, x, sgdParams)
 
     loss = loss + fs[1]
     return loss
