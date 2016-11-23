@@ -63,16 +63,11 @@ print('Playing Catch game with RNN\n')
 local logger, parent = torch.class('logger','optim.Logger')
 function logger:__init(opt)
    parent.__init(self)
-   self.gblogger = parent.new(paths.concat(opt.savedir,'pergame.log'))
-   self.gblogger:setNames{'accuracy'}
-   self.tblogger = parent.new(paths.concat(opt.savedir,'pertime.log'))
-   self.tblogger:setNames{'ms', 'accuracy'}
+   self.logger = parent.new(paths.concat(opt.savedir,'ms_acc_loss.log'))
+   self.logger:setNames{'ms', 'accuracy', 'loss'}
 end
-function logger:tbwrite(time, acc)
-   self.tblogger:add{time, acc}
-end
-function logger:write(acc)
-   self.gblogger:add{acc}
+function logger:write(time, acc, loss)
+   self.logger:add{time, acc, loss}
 end
 logger:__init(opt)
 
@@ -305,8 +300,7 @@ for game = 1, opt.epochs do
         print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
         local acc = winCount / opt.progFreq
-        logger:write(acc)
-        logger:tbwrite(accTime, acc)
+        logger:write(accTime, acc, err)
         winCount = 0
         err = 0
         randomActions = 0

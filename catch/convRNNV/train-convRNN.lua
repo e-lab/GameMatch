@@ -171,8 +171,7 @@ for game = 1, opt.epochs do
         print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
         local acc = winCount / opt.progFreq
-        logger:write(acc)
-        logger:tbwrite(accTime, acc)
+        logger:write(accTime, acc, err)
         winCount = 0
         err = 0
         randomActions = 0

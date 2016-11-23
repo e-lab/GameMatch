@@ -1,16 +1,11 @@
 local logger, parent = torch.class('logger','optim.Logger')
 function logger:__init(opt)
    parent.__init(self)
-   self.gblogger = parent.new(paths.concat(opt.savedir,'pergame.log'))
-   self.gblogger:setNames{'accuracy'}
-   self.tblogger = parent.new(paths.concat(opt.savedir,'pertime.log'))
-   self.tblogger:setNames{'ms', 'accuracy'}
+   self.logger = parent.new(paths.concat(opt.savedir,'ms_acc_loss.log'))
+   self.logger:setNames{'ms','accuracy', 'loss'}
 end
-function logger:tbwrite(time, acc)
-   self.tblogger:add{time, acc}
-end
-function logger:write(acc)
-   self.gblogger:add{acc}
+function logger:write(time, acc, loss)
+   self.logger:add{time, acc, loss}
 end
 -- memory for experience replay:
 function Memory(maxMemory, discount)
