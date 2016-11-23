@@ -5,6 +5,11 @@
 ```
 th testRNNconv.lua
 ```
+#To train convRNN verion
+
+```
+th train-convRNN.lua --useGPU
+```
 ##Explanation
 
 - n : input channel

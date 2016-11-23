@@ -57,7 +57,7 @@ local RNN = {}
 -- this implementation is similar to a focused attentional mechanisms on recent hidden weights, using a fast associative memory
 
 -- Returns a simple RNN model
-local function getConvRNN(n, d, nHL, K, nFW, batch, w, h)
+local function getConvRNN(n, d, nHL, K, batch, w, h, nFW)
    local inputs = {}
    table.insert(inputs, nn.Identity()())       -- input X
    for j = 1, nHL do
@@ -123,8 +123,8 @@ local function getConvRNN(n, d, nHL, K, nFW, batch, w, h)
 end
 
 -- Links all the RNN models, given the # of sequences
-function RNN.getModel(n, d, nHL, K, T, nFW, batch, w, h)
-   local convRNN = getConvRNN(n, d, nHL, K, nFW, batch, w, h)
+function RNN.getModel(n, d, nHL, K, T, batch, w, h, nFW)
+   local convRNN = getConvRNN(n, d, nHL, K, batch, w, h, nFW)
 
    local clones = {}
    for i = 1, T do
