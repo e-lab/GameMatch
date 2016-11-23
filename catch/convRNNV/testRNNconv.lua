@@ -1,12 +1,13 @@
+torch.setdefaulttensortype('torch.FloatTensor')
 require 'nn'
 opt = {}
-opt.fw = false
+opt.fw = true
 gm = require 'RNNconv'
 
 n , d , nHL, K, T, nFW = 2, 4, 2, 1, 8, 3
 w, h , action = 10 , 10 , 3
 batch = 64
-model, single = gm.getModel(n, d, nHL, K, T, nFW)
+model, single = gm.getModel(n, d, nHL, K, T, nFW, batch, w, h)
 
 print(model)
 x = torch.zeros(batch,T,n,10,10)

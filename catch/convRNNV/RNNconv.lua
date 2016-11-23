@@ -57,7 +57,7 @@ local RNN = {}
 -- this implementation is similar to a focused attentional mechanisms on recent hidden weights, using a fast associative memory
 
 -- Returns a simple RNN model
-local function getPrototype(n, d, nHL, K, nFW)
+local function getPrototype(n, d, nHL, K, nFW, batch, w, h)
    local inputs = {}
    table.insert(inputs, nn.Identity()())       -- input X
    for j = 1, nHL do
@@ -91,7 +91,7 @@ local function getPrototype(n, d, nHL, K, nFW)
       end
 
       if opt.fw then -- compute fast weights output:
-        hFW = {hPrev} - nn.FastWeights(nFW, d)
+        hFW = {hPrev} - nn.FastWeights(nFW, d, batch, w, h)
         hFWNormed = {hFW} - nn.SoftMax() -- SoftMax used to normalize the results
         h2h = hFWNormed - scNB(d, d, kw, kh, stw, sth, paw, pah) - nn.ReLU() -- project fast weights into hidden layer
         nextH = {i2h, h2h} - nn.CAddTable(1,1)
@@ -123,8 +123,8 @@ local function getPrototype(n, d, nHL, K, nFW)
 end
 
 -- Links all the RNN models, given the # of sequences
-function RNN.getModel(n, d, nHL, K, T, nFW)
-   local prototype = getPrototype(n, d, nHL, K, nFW)
+function RNN.getModel(n, d, nHL, K, T, nFW, batch, w, h)
+   local prototype = getPrototype(n, d, nHL, K, nFW, batch, w, h)
 
    local clones = {}
    for i = 1, T do
