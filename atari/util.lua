@@ -1,6 +1,10 @@
 local ut = torch.class('ut')
 function ut:__init()
-   print('init util')
+   self.logger = optim.Logger(paths.concat(opt.savedir,'ms_acc_loss.log'))
+   self.logger:setNames{'ms','accuracy', 'loss'}
+end
+function ut:write(time, acc, loss)
+   self.logger:add{time, acc, loss}
 end
 -- memory for experience replay:
 function ut:Memory(maxMemory, discount)

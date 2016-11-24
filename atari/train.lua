@@ -6,9 +6,12 @@ if not dqn then
    require "initenv"
 end
 require 'image'
+require 'optim'
 local of = require 'opt'
 opt = of.parse(arg)
 local ut = require 'util'
+
+--Create logger inside init
 ut:__init()
 -- format options:
 opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
@@ -106,15 +109,13 @@ local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in succe
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
-local winCount = 0
-local err = 0
+local winCount, err, accTime = 0, 0, 0
 local randomActions = 0
 
 print('Begin training:')
 for game = 1, opt.epochs do
     sys.tic()
     local steps = 0 -- counts steps to game win
-    print(game)
     -- Initialise the environment.
     local screen, reward, gameOver = gameEnv:nextRandomGame()
     local currentState = ut:preProcess(screen) -- resize to smaller size
@@ -172,11 +173,14 @@ for game = 1, opt.epochs do
     if game%opt.progFreq == 0 then
         print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
+        local acc = winCount / opt.progFreq
+        ut:write(accTime, acc, err)
         winCount = 0
         err = 0
         randomActions = 0
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
+    accTime = math.ceil(accTime + sys.toc()*1000)
     collectgarbage()
 end
 torch.save(opt.savedir.."/model-rnn.net", prototype:clearState())

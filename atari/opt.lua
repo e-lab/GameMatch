@@ -30,7 +30,7 @@ function o.parse(arg)
      --maxMemory             (default 1e3)       Experience Replay buffer memory
      --epochs                (default 1e5)       number of training steps to perform
      --useGPU                                    use GPU in training
-     --gpuId                 (default 2)         which GPU to use
+     --gpuId                 (default 1)         which GPU to use
 
      Model parameters:
      --fw                                        Use FastWeights or not

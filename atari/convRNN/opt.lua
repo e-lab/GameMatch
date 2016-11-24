@@ -36,7 +36,7 @@ function o.parse(arg)
      Model parameters:
      --fw                                        Use FastWeights or not
      --nLayers               (default 1)         RNN layers
-     --nHidden               (default 10)       RNN hidden size
+     --nHidden               (default 64)       RNN hidden size
      --nFW                   (default 8)         number of fast weights previous vectors
 
      Display and save parameters:

@@ -173,11 +173,14 @@ for game = 1, opt.epochs do
     if game%opt.progFreq == 0 then
         print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
+        local acc = winCount / opt.progFreq
+        ut:write(accTime, acc, err)
         winCount = 0
         err = 0
         randomActions = 0
     end
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
+    accTime = math.ceil(accTime + sys.toc()*1000)
     collectgarbage()
 end
 torch.save(opt.savedir.."/model-rnn.net", prototype:clearState())
