@@ -309,5 +309,5 @@ for game = 1, opt.epochs do
     accTime = math.ceil(accTime + sys.toc()*1000)
     collectgarbage()
 end
-torch.save(opt.savedir.."/catch-model-rnn.net", prototype:clearState())
+torch.save(opt.savedir.."/catch-model-rnn.net", model:float():clearState())
 print("Model saved!")

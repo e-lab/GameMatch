@@ -315,5 +315,5 @@ for game = 1, opt.epochs do
     if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
     collectgarbage()
 end
-torch.save(opt.savedir.."/model-rnn.net", prototype:clearState())
+torch.save(opt.savedir.."/model-rnn.net", model:float():clearState())
 print("Model saved!")
