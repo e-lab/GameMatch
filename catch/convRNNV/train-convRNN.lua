@@ -12,15 +12,15 @@ require 'nn'
 require 'image'
 require 'optim'
 require 'nngraph'
-local logger = require 'util'
 require 'paths'
+local logger = require 'util'
 local of = require 'opt'
 opt = of.parse(arg)
 print(opt)
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
-convRNN = require 'RNNconv'
+local convRNN = require 'RNNconv'
 os.execute('mkdir '..opt.savedir)
 torch.save(paths.concat(opt.savedir,'opt.t7'),opt)
 
@@ -28,13 +28,23 @@ logger:__init(opt)
 print('Playing Catch game with RNN\n')
 
 local nbStates = opt.gridSize * opt.gridSize
+local nbActions = opt.nbActions
 local wi = opt.gridSize
 local hi = opt.gridSize
-local batch = opt.batchSize
 local ch = opt.ch
+local batch = opt.batchSize
 local hCh = opt.nHidden
 local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
-local nbActions = opt.nbActions
+
+-- Params for Stochastic Gradient Descent (our optimizer).
+local sgdParams = {
+    learningRate = opt.learningRate,
+    learningRateDecay = opt.learningRateDecay,
+    weightDecay = opt.weightDecay,
+    momentum = opt.momentum,
+    dampening = 0,
+    nesterov = true
+}
 
 -- Create the base RNN model:
 local model, prototype
@@ -76,16 +86,8 @@ for l = 1, opt.nLayers do
    if opt.useGPU then RNNh0Batch[l]=RNNh0Batch[l]:cuda() RNNh0Proto[l]=RNNh0Proto[l]:cuda() end
 end
 
--- Params for Stochastic Gradient Descent (our optimizer).
-local sgdParams = {
-    learningRate = opt.learningRate,
-    learningRateDecay = opt.learningRateDecay,
-    weightDecay = opt.weightDecay,
-    momentum = opt.momentum,
-    dampening = 0,
-    nesterov = true
-}
-
+-- test model:
+print('Testing model and prototype RNN:')
 local ttest = {torch.Tensor(batch, nSeq, ch, wi, hi),
          torch.Tensor(batch, hCh, wi, hi)}
 -- test model:
@@ -114,7 +116,9 @@ for game = 1, opt.epochs do
 
     -- Initialise the environment.
     gameEnv.reset()
+    local reward = 0
     local isGameOver = false
+    local nextState
 
     -- The initial state of the environment.
     local currentState = gameEnv.observe()
@@ -123,6 +127,7 @@ for game = 1, opt.epochs do
     RNNhProto = table.unpack(RNNh0Proto)
 
     while not isGameOver do
+        if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
         steps = steps + 1 -- count game steps
         local action, q
         if opt.useGPU then currentState = currentState:cuda() end
@@ -143,9 +148,9 @@ for game = 1, opt.epochs do
         seqMem[steps] = currentState -- store state sequence into memory
         seqAct[steps][action] = 1
 
-        local nextState, reward, gameOver = gameEnv.act(action)
+        nextState, reward, gameOver = gameEnv.act(action)
 
-        if (reward == 1) then
+        if (reward >= 1) then
             winCount = winCount + 1
             memory.remember({
                 states = seqMem:byte(), -- save as byte, use as float
