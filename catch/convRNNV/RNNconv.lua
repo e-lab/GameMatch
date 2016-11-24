@@ -107,8 +107,8 @@ local function getConvRNN(n, d, nHL, K, batch, w, h, nFW)
       table.insert(outputs, nextH)
    end
 
-   local project = outputs[#outputs] - scNB(d, K, kw, kh, stw, sth, paw, pah)
-   local action = project - nn.View(K*h*w) - nn.Linear(K*h*w, K) - nn.LogSoftMax()
+   local project = outputs[#outputs] - scNB(d, K, kw, kh, stw, sth, paw, pah) - nn.Tanh()
+   local action = project - nn.View(K*h*w) - nn.Linear(K*h*w, K) - nn.Tanh()
           action:annotate{name = 'y\'[t]',
                     graphAttributes = {
                     style = 'filled',
