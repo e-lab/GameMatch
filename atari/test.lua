@@ -6,63 +6,16 @@ if not dqn then
     require "initenv"
 end
 require 'image'
-require 'pl'
-lapp = require 'pl.lapp'
-opt = lapp [[
-
-  Game options:
-  --gridSize            (default 20)          game grid size 
-  --discount            (default 0.9)         discount factor in learning
-  --epsilon             (default 1)           initial value of ϵ-greedy action selection
-  --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
-  --playFile            (default '')          human play file to initialize exp. replay memory
-  --framework           (default 'alewrap')         name of training framework
-  --env                 (default 'breakout')        name of environment to use')
-  --game_path           (default 'roms/')           path to environment file (ROM)
-  --env_params          (default 'useRGB=true')     string of environment parameters
-  --pool_frms_type      (default 'max')             pool inputs frames mode
-  --pool_frms_size      (default '1')               pool inputs frames size
-  --actrep              (default 4)                 how many times to repeat action, frames to skip to speed up game and inference
-  --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
- 
-  Training parameters:
-  --threads               (default 8)         number of threads used by BLAS routines
-  --seed                  (default 1)         initial random seed
-  --useGPU                                    use GPU in training
-  --gpuId                 (default 1)         which GPU to use
-
-  Model parameters:
-  --loadNet             (default '')                trained neural network to load
-  --fw                                        Use FastWeights or not
-  --nLayers               (default 1)         RNN layers
-  --nHidden               (default 128)       RNN hidden size
-  --nFW                   (default 8)         number of fast weights previous vectors
-  
-  Display and save parameters:
-  --zoom                  (default 4)        zoom window
-  -v, --verbose           (default 2)        verbose output
-  --display                                  display stuff
-  --savedir          (default './results')   subdirectory to save experiments in
-  --progFreq              (default 1e2)       frequency of progress output
-]]
-
--- format options:
-opt.pool_frms = 'type=' .. opt.pool_frms_type .. ',size=' .. opt.pool_frms_size
-
-if opt.verbose >= 1 then
-    print('Using options:')
-    for k, v in pairs(opt) do
-        print(k, v)
-    end
-end
-
-
+local of = require 'opt' -- options file
+local opt = of.parse(arg)
+print('Options are:', opt)
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
-local gameEnv, gameActions, agent, opt = setup(opt) -- setup game environment
+-- setup game environment:
+local gameEnv, gameActions = gameEnvSetup(opt) -- setup game environment
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
 local nbStates = opt.gridSize * opt.gridSize
@@ -106,7 +59,8 @@ while true do
     sys.tic()
     
     -- Initialise the environment.
-    local screen, reward, gameOver = gameEnv:nextRandomGame()
+    local screen, reward, isGameOver = gameEnv:nextRandomGame()
+    screen, reward, isGameOver = gameEnv:step(gameActions[2], true) -- start game!
     local currentState = preProcess(screen) -- resize to smaller size
     local isGameOver = false
     -- reset RNN to intial state:
@@ -119,12 +73,11 @@ while true do
         local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is state...
         local action = index[1]
         print(action)
-        screen, reward, gameOver = gameEnv:step(gameActions[action]) -- test mode 
+        screen, reward, isGameOver = gameEnv:step(gameActions[action]) -- test mode 
         local nextState = preProcess(screen)
 
         -- Update the current state and if the game is over:
         currentState = nextState
-        isGameOver = gameOver
 
         win = image.display({image=screen, zoom=2, win=win})
     end

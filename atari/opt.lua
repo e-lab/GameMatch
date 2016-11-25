@@ -34,6 +34,7 @@ function o.parse(arg)
      --gpuId                 (default 1)         which GPU to use
 
      Model parameters:
+     --loadNet               (default '')        trained model file to use
      --fw                                        Use FastWeights or not
      --nLayers               (default 1)         RNN layers
      --nHidden               (default 128)       RNN hidden size

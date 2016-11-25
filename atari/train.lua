@@ -27,7 +27,7 @@ if opt.useGPU then
   print('Using GPU number', opt.gpuId)
 end
 
--- setup game environment
+-- setup game environment:
 local gameEnv, gameActions = gameEnvSetup(opt)
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
