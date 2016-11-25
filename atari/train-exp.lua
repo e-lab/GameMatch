@@ -2,6 +2,9 @@
 -- November 2016
 -- Deep RNN for reinforcement online learning
 
+-- train from a human play/experience data
+-- run with:  --playFile filename
+
 if not dqn then
     require "initenv"
 end
@@ -90,73 +93,65 @@ local winCount = 0
 local err = 0
 local randomActions = 0
 
-print('Begin training:')
-for game = 1, opt.epochs do
+
+
+
+print('Begin training / testing:')
+
+for te = 1, 10 do
+
+  -- train network on play game saved file data:
+  for game = 1, opt.epochs do
     sys.tic()
-    local steps = 0 -- counts steps to game win
-    
-    -- Initialise the environment.
+    -- We get a batch of training data to train the model:
+    local inputs, targets = memory.getBatch(opt.batchSize, nSeq, nbActions, nbStates)
+    -- Train the network which returns the error:
+    err = err + trainer.trainNetwork(model, RNNh0Batch, inputs, targets, nSeq, nbActions)
+    if game%opt.progFreq == 0 then 
+        print(string.format("Training sequence: %d, error: %.4f, time [ms]: %d", 
+                             game,  err/opt.progFreq, sys.toc()*1000))
+        err = 0
+    end
+    collectgarbage()
+  end
+
+  -- then test 100 games:
+  for game = 1, 100 do
+    sys.tic()
+
     local screen, reward, isGameOver = gameEnv:nextRandomGame()
+    screen, reward, isGameOver = gameEnv:step(gameActions[2], true) -- start game!
     local currentState = trainer.preProcess(screen) -- resize to smaller size
     -- reset RNN to intial state:
     RNNhProto = table.unpack(RNNh0Proto)
     while not isGameOver do
-        if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
-        steps = steps + 1 -- count game steps
-        local action
         if opt.useGPU then currentState = currentState:cuda() end
         prototype:forward({currentState:view(1, nbStates), table.unpack(RNNh0Proto)}) -- HAVE TO DO THIS to clear proto state, or crashes
         local q = prototype:forward({currentState:view(1, nbStates), RNNhProto}) -- Forward the current state through the network.
         RNNhProto = q[1]
-        -- Decides if we should choose a random action, or an action from the policy network.
-        if torch.uniform() < epsilon then
-            action = torch.random(1, nbActions)
-            randomActions = randomActions + 1
-        else
-            -- Find the max index (the chosen action).
-            local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is state...
-            action = index[1]
-        end
-
-        -- store to memory (but be careful to avoid larger than max seq: nSeq)
-        if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
-        seqMem[steps] = currentState -- store state sequence into memory
-        seqAct[steps][action] = 1
-     
+        -- make move:
+        -- Find the max index (the chosen action).
+        local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is state...
+        local action = index[1]
+        
         screen, reward, isGameOver = gameEnv:step(gameActions[action], true)
         local nextState = trainer.preProcess(screen)
 
-        if reward >= 1 then 
-            winCount = winCount + 1 
-            memory.remember({
-                states = seqMem:byte(), -- save as byte, use as float
-                actions = seqAct:byte()
-            })
-            -- We get a batch of training data to train the model:
-            local inputs, targets = memory.getBatch(opt.batchSize, nSeq, nbActions, nbStates)
-            -- Train the network which returns the error:
-            err = err + trainer.trainNetwork(model, RNNh0Batch, inputs, targets, nSeq, nbActions)
-        end
-        -- Update the current state and if the game is over:
         currentState = nextState
 
         if opt.display then 
-            win = image.display({image=currentState:view(opt.gridSize,opt.gridSize), zoom=10, win=win})
+            -- win = image.display({image=currentState:view(opt.gridSize,opt.gridSize), zoom=10, win=win})
             win2 = image.display({image=screen, zoom=1, win=win2})
         end
     end
-    seqAct:zero()
-    steps = 0 -- resetting step count (which is always grdiSize-2 anyway...)
 
     if game%opt.progFreq == 0 then 
-        print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d", 
-                             game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
+        print(string.format("Game: %d, epsilon: %.2f, Accuracy: %d%%, time [ms]: %d", 
+                             game,  epsilon, winCount/opt.progFreq*100, sys.toc()*1000))
         winCount = 0
-        err = 0 
-        randomActions = 0
     end
-    if epsilon > opt.epsilonMinimumValue then epsilon = epsilon - epsUpdate  end -- update epsilon for online-learning
     collectgarbage()
+  end
 end
 torch.save(opt.savedir.."/proto-rnn.net", prototype:float():clearState())
 print("Prototype model saved!")
