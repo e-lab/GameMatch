@@ -14,7 +14,7 @@ require 'model'
 require 'optim'
 
 
-function setup(_opt)
+function gameEnvSetup(_opt)
     assert(_opt)
 
     --preprocess options:

@@ -59,13 +59,12 @@ torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
-torch.save(paths.concat(opt.savedir,'opt.t7'),opt)
-require('train') -- train functions
+torch.save(opt.savedir..'/opt.t7', opt)
 package.path = '../catch/?.lua;' .. package.path
 local rnn = require 'RNN'
 
 -- setup game environment
-local gameEnv, gameActions = setup(opt)
+local gameEnv, gameActions = gameEnvSetup(opt)
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
 local nbStates = opt.gridSize * opt.gridSize
