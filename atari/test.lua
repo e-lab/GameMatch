@@ -118,7 +118,7 @@ while true do
         -- find best action:
         local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is state...
         local action = index[1]
-        
+        print(action)
         screen, reward, gameOver = gameEnv:step(gameActions[action]) -- test mode 
         local nextState = preProcess(screen)
 
