@@ -5,6 +5,9 @@
 -- playing CATCH version:
 -- https://github.com/SeanNaren/QlearningExample.torch
 
+-- example to run with RNN: qlua test.lua results/catch-model-rnn.net 10 rnn
+
+
 require 'CatchEnvironment'
 require 'nn'
 require 'image'

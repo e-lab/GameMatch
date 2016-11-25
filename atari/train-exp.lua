@@ -3,7 +3,9 @@
 -- Deep RNN for reinforcement online learning
 
 -- train from a human play/experience data
+
 -- run with:  --playFile filename
+-- qlua train-exp.lua --playFile results/play-memory-5019.t7 --epochs 1e3 --display --batchSize 512
 
 if not dqn then
     require "initenv"
