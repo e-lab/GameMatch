@@ -70,7 +70,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
-local gameEnv, gameActions, agent, opt = setup(opt) -- setup game environment
+local gameEnv, gameActions = gameEnvSetup(opt) -- setup game environment
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
 local nbStates = opt.gridSize * opt.gridSize
