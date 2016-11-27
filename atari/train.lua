@@ -28,7 +28,7 @@ if opt.useGPU then
 end
 
 -- setup game environment:
-local gameEnv, gameActions = gameEnvSetup(opt)
+local gameEnv, gameActions, agent, opt = gameEnvSetup(opt)
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
 local nbStates = opt.gridSize * opt.gridSize
