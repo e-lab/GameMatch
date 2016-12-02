@@ -21,6 +21,12 @@ local sf = string.format
 
 -- included local packages
 local convLSTM = paths.dofile('convLSTM.lua')
+local backend = nn
+if opt.useGPU then
+   require 'cudnn'
+   backend = cudnn
+end
+local scNB = backend.SpatialConvolution:noBias()
 
 function prednet:__init(opt)
    -- Input/Output channels for A of every layer
@@ -140,9 +146,10 @@ local function block(l, L, iChannel, oChannel, vis,K,w,h)
    local g
    if l == 1 then
       -- For first layer return Ah for viewing
-      local out = Ah - nn.View(oChannel*w*h) - nn.Linear(oChannel*w*h,K)
-      - nn.Tanh()
-      g = nn.gModule(inputs , {E, out})
+   local project = Ah - scNB(oChannel, K, 3, 3, 1, 1, 1, 1)
+            - nn.Tanh()
+   local action = project - nn.View(K*h*w) - nn.Linear(K*h*w, K) - nn.Tanh()
+      g = nn.gModule(inputs , {E, action})
    else
       g = nn.gModule(inputs, {E})
    end

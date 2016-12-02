@@ -28,13 +28,15 @@ function Memory(maxMemory, discount)
         end
     end
 
-    function memory.getBatch(batchSize, nbActions, nbStates, nSeq, dumy)
+    function memory.getBatch(batchSize, nbActions, nbStates, nSeq, dumy, predOpt)
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch)
         local memoryLength = #memory
-        local chosenBatchSize = batchSize --math.min(batchSize, memoryLength)
-        local inputs = torch.zeros(batchSize, nSeq, dumy:size(1), dumy:size(2), dumy:size(3))
-        local targets = torch.zeros(batchSize, nSeq, nbActions)
+        local chosenBatchSize = math.min(batchSize, memoryLength)
+        local inputs = torch.zeros(chosenBatchSize, nSeq, dumy:size(1), dumy:size(2), dumy:size(3))
+        local targets = torch.zeros(chosenBatchSize, nSeq, nbActions)
+        local dumy, RNNhBatch = getBatchInput(chosenBatchSize, predOpt.seq,
+         predOpt.height, predOpt.width, predOpt.layers, predOpt.channels, 2)
 
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
@@ -44,7 +46,7 @@ function Memory(maxMemory, discount)
         end
         if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
 
-        return inputs, targets
+        return inputs, targets, RNNhBatch
     end
     function memory.getLengty()
        return #memory
@@ -61,14 +63,21 @@ function tensor2Table(inputTensor, padding, state)
    for l = 1, padding do outputTable[l + inputTensor:size(1)] = state[l]:clone() end
    return outputTable
 end
+function copyTable(table)
+   local copy = {}
+   for i ,item in ipairs(table) do
+      copy[i] = item
+   end
+   return copy
+end
 
 -- training code:
 function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq, nbActions, batch)
     local loss = 0
     local x, gradParameters = model:getParameters()
 
+     model:zeroGradParameters()
     local function feval(x_new)
-        gradParameters:zero()
         inputs = {inputs, table.unpack(state)} -- attach states
         if opt.useGPU then
            for i = 1 , #inputs do inputs[i] = inputs[i]:cuda() end
@@ -80,6 +89,7 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
         for i = 1, nSeq do
             predictions[i] = out[i]
         end
+        --Swap seq batch to batch seq
         predictions = predictions:transpose(2,1)
         -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
         local loss = criterion:forward(predictions, targets)
@@ -93,7 +103,7 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
         return loss, gradParameters
     end
 
-    local _, fs = optim.sgd(feval, x, sgdParams)
+    local _, fs = optim.adam(feval, x, sgdParams)
 
     loss = loss + fs[1]
     return loss
@@ -157,6 +167,11 @@ function getInput(seq, height, width, L, channels, mode)
    end
 
    return x[1], y
+end
+function tableGPU(table)
+   for i, item in ipairs(table) do
+      table[i] = item:cuda()
+   end
 end
 function resize(im)
    out = image.scale(img, opt.gridSize, opt.gridSize)

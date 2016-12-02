@@ -1,3 +1,4 @@
+-- convRNN version
 local logger, parent = torch.class('logger','optim.Logger')
 function logger:__init(opt)
    parent.__init(self)

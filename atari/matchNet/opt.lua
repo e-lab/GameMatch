@@ -5,14 +5,14 @@ function o.parse(arg)
    local opt = lapp [[
 
      Game options:
-     --gridSize            (default 20)          game grid size
+     --gridSize            (default 64)          game grid size
      --discount            (default 0.9)         discount factor in learning
      --epsilon             (default 1)           initial value of ϵ-greedy action selection
      --epsilonMinimumValue (default 0.001)       final value of ϵ-greedy action selection
      --playFile            (default '')          human play file to initialize exp. replay memory
      --framework           (default 'alewrap')         name of training framework
      --env                 (default 'breakout')        name of environment to use')
-     --ch                  (default 1)           This is preprocessed image maxPooled and div by 3
+     --ch                  (default 3)           This is preprocessed image maxPooled and div by 3
      --game_path           (default 'roms/')           path to environment file (ROM)
      --env_params          (default 'useRGB=true')     string of environment parameters
      --pool_frms_type      (default 'max')             pool inputs frames mode
@@ -27,23 +27,25 @@ function o.parse(arg)
      -d,--learningRateDecay  (default 1e-9)      learning rate decay
      -w,--weightDecay        (default 0)         L2 penalty on the weights
      -m,--momentum           (default 0.9)       momentum parameter
-     --batchSize             (default 64)        batch size for training
+     -b,--batchSize             (default 10)        batch size for training
      --maxMemory             (default 1e3)       Experience Replay buffer memory
      --epochs                (default 1e5)       number of training steps to perform
      --useGPU                                    use GPU in training
-     --gpuId                 (default 2)         which GPU to use
+     --gpuId                 (default 1)         which GPU to use
+     --pre                   (default preTrained/atariLy3/model-98.net)
 
      Model parameters:
      --fw                                        Use FastWeights or not
-     --nLayers               (default 1)         RNN layers
+     --nLayers               (default 3)         RNN layers
      --nHidden               (default 64)       RNN hidden size
      --nFW                   (default 8)         number of fast weights previous vectors
+     --nSeq                  (default 5)
 
      Display and save parameters:
      --zoom                  (default 4)        zoom window
      -v, --verbose           (default 2)        verbose output
      --display                                  display stuff
-     --savedir          (default './results')   subdirectory to save experiments in
+     --savedir          (default './atariLy3')   subdirectory to save experiments in
      --progFreq              (default 1e2)       frequency of progress output
    ]]
    return opt

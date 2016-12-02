@@ -8,6 +8,10 @@ require 'nngraph' -- IMPORTANT!!! require nngraph after adding our nn module!!!!
 -- otherwise it will not inherit the right overloaded functions!
 --nngraph.setDebug(true) -- if you need to debug uncomment this
 local backend = nn
+if opt.useGPU then
+   require 'cudnn'
+   backend = cudnn
+end
 local scNB = backend.SpatialConvolution:noBias()
 
 local RNN = {}

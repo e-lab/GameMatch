@@ -25,6 +25,7 @@ function o.parse(arg)
      --epochs                (default 1e4)       number of training steps to perform
      --useGPU                                    use GPU in training
      --gpuId                 (default 1)         which GPU to use
+     --nSeq                  (default 10)         Sequenc length
 
      Model parameters:
      --fw                                        Use FastWeights or not

@@ -34,7 +34,8 @@ local hi = opt.gridSize
 local ch = opt.ch
 local batch = opt.batchSize
 local hCh = opt.nHidden
-local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
+--opt.gridSize-2 -- RNN sequence length in this game is grid size
+local nSeq = opt.gridSize - 2
 
 -- Params for Stochastic Gradient Descent (our optimizer).
 local sgdParams = {
@@ -128,25 +129,22 @@ for game = 1, opt.epochs do
 
     -- rest RNN to intial state:
     for i=1, #RNNh0Proto do
-       if opt.useGPU then
-          RNNhProto[i] = RNNh0Proto[i]:cuda():clone()
-       else
           RNNhProto[i] = RNNh0Proto[i]:clone()
-       end
     end
+    -- Ship to GPU
+    if opt.useGPU then tableGPU(RNNhProto) end
     while not isGameOver do
         if steps >= nSeq then steps = 0 end -- reset steps if we are still in game
         steps = steps + 1 -- count game steps
         local action, q
         if opt.useGPU then currentState = currentState:cuda() end
-        -- print(currentState:view(1, nbStates), RNNhProto)
         q = prototype:forward({currentState:view( ch, wi, hi ), unpack(RNNhProto)}) -- Forward the current state through the network.
        for i =1 , #q do
           if i == 1 then
              -- This is defined in the model code
              RNNhProto[i] = torch.zeros(
-             predOpt.channels[predOpt.layers+1],
-             predOpt.height/2^(opt.nLayers), predOpt.width/2^(opt.nLayers))
+               predOpt.channels[predOpt.layers+1],
+               predOpt.height/2^(opt.nLayers), predOpt.width/2^(opt.nLayers))
           else
              RNNhProto[i] = q[i]:clone()
           end
@@ -162,7 +160,9 @@ for game = 1, opt.epochs do
             randomActions = randomActions + 1
         else
             -- Find the max index (the chosen action).
-            local max, index = torch.max(q[1], 1) -- [1] is the output
+            -- q[1] is the action output
+            -- Select maximum to get index
+            local max, index = torch.max(q[1], 1)
             action = index[1]
         end
         -- store to memory
@@ -172,6 +172,7 @@ for game = 1, opt.epochs do
 
         nextState, reward, gameOver = gameEnv.act(action)
 
+        -- Select action from trajectory that maximize reward
         if (reward >= 1) then
             winCount = winCount + 1
             memory.remember({
@@ -181,9 +182,10 @@ for game = 1, opt.epochs do
             local mlength = memory.getLengty()
             if mlength > batch then
                -- We get a batch of training data to train the model.
-               local inputs, targets = memory.getBatch(batch, nbActions, nbStates, nSeq, x)
+               local inputs, targets, RNNhBatch = memory.getBatch(
+                  batch, nbActions, nbStates, nSeq, x, predOpt)
                -- Train the network which returns the error.
-               err = err + trainNetwork(model, RNNh0Batch, inputs, targets, criterion, sgdParams, nSeq, nbActions, batch)
+               err = err + trainNetwork(model, RNNhBatch, inputs, targets, criterion, sgdParams, nSeq, nbActions, batch)
             end
         end
         -- Update the current state and if the game is over.

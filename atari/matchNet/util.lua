@@ -29,7 +29,7 @@ function ut:Memory(maxMemory, discount)
         end
     end
 
-    function memory.getBatch(batchSize, nbActions, nbStates, nSeq, dumy)
+    function memory.getBatch(batchSize, nbActions, nbStates, nSeq, dumy, predOpt)
         -- We check to see if we have enough memory inputs to make an entire
         -- batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough
@@ -41,6 +41,8 @@ function ut:Memory(maxMemory, discount)
                                      batchSize, nSeq, dumy:size(1),
                                      dumy:size(2), dumy:size(3))
         local targets = torch.zeros(batchSize, nSeq, nbActions)
+        local dumy, RNNhBatch = getBatchInput(chosenBatchSize, predOpt.seq,
+         predOpt.height, predOpt.width, predOpt.layers, predOpt.channels, 2)
 
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
@@ -50,7 +52,7 @@ function ut:Memory(maxMemory, discount)
         end
         if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
 
-        return inputs, targets
+        return inputs, targets, RNNhBatch
     end
     function memory.getLengty()
        return #memory
@@ -65,7 +67,7 @@ function prepareState(q,predOpt)
        -- This is defined in the model code
        RNNhProto[i] = torch.zeros(
           predOpt.channels[predOpt.layers+1],
-          predOpt.height/2, predOpt.width/2)
+          predOpt.height/2^(opt.nLayers), predOpt.width/2^(opt.nLayers))
     else
        RNNhProto[i] = q[i]:clone()
     end
@@ -133,8 +135,12 @@ function ut:preProcess(im)
   local net = nn.SpatialMaxPooling(4,4,4,4)
   -- local pooled = net:forward(im[1])
   local pooled = net:forward(im[1][{{},{94,194},{9,152}}])
-  -- print(pooled:size())
-  local out = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
+  local out
+  if opt.ch == 1 then
+   out = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
+  else
+   out = image.scale(pooled, opt.gridSize, opt.gridSize)
+  end
   return out
 end
 function getBatchInput(b, seq, height, width, L, channels, mode)

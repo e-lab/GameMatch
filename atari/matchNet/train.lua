@@ -35,7 +35,7 @@ local hi = opt.gridSize
 local ch = opt.ch
 local batch = opt.batchSize
 local hCh = opt.nHidden
-local nSeq = 20--4*opt.gridSize -- RNN max sequence length in this game is grid size
+local nSeq = opt.gridSize - 2 -- RNN max sequence length in this game is grid size
 
 
 -- Params for Stochastic Gradient Descent (our optimizer).
@@ -51,14 +51,19 @@ local predOpt = {
    layers = opt.nLayers, seq = nSeq, height = hi, width = wi, saveGraph = false,
    channels = {ch}, K = nbActions
 }
-for i = 1, predOpt.layers do
-   predOpt.channels[i+1] = 2^(i+3)
+for l = 2, opt.nLayers + 1 do
+   predOpt.channels[l] = 2^(l +  3)
 end
 local prednet = require 'models/prednet'
 -- Initialize model generator
 prednet:__init(predOpt)
 -- Get the model unwrapped over time as well as the prototype
-local model, prototype = prednet:getModel()
+local model, prototype
+if opt.pre then
+   model, prototype = prednet:getModel(opt.pre)
+else
+   model, prototype = prednet:getModel()
+end
 
 -- Mean Squared Error for our loss function.
 local criterion = nn.MSECriterion()
@@ -81,25 +86,24 @@ local xb, RNNh0Batch = getBatchInput(
           batch, predOpt.seq, predOpt.height,
           predOpt.width, predOpt.layers, predOpt.channels, 2)
 dummyX = {xb, unpack(RNNh0Batch)}
+print(dummyX)
 -- test model:
 if opt.useGPU then shipToGPU(dummyX) end
-print('Dummy')
-print(dummyX)
 a = model:forward(dummyX)
 print('TEST model:', a)
 
+-- test model:
+print('Dummy proto')
 local x, RNNh0Proto = getInput(predOpt.seq, predOpt.height, predOpt.width, predOpt.layers, predOpt.channels, 1)
 dummyX = {x, unpack(RNNh0Proto)}
--- test model:
 if opt.useGPU then shipToGPU(dummyX) end
-print('Dummy proto')
 print(dummyX)
 a = prototype:forward(dummyX)
 print('TEST proto:', a)
 
 -- setup memory and training variables:
 local memory = ut:Memory(maxMemory, discount)
-local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
+local seqMem = torch.zeros(nSeq, ch, wi, hi) -- store sequence of states in successful run
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
@@ -131,13 +135,12 @@ for game = 1, opt.epochs do
         steps = steps + 1 -- count game steps
         if opt.useGPU then currentState = currentState:cuda() end
         -- print(currentState:view(1, nbStates), RNNhProto)
-
         q = prototype:forward({
            currentState:view( ch, wi, hi ),
-           unpack(RNNhProto)}) -- Forward the current state through the network.
+           table.unpack(RNNhProto)}) -- Forward the current state through the network.
 
        -- Prepare next iteration state
-       RNNhProto = prepareState(q,predOpt)
+       RNNhProto = prepareState(q, predOpt)
        if opt.useGPU then shipToGPU(RNNhProto) end
         -- Decides if we should choose a random action,
         -- or an action from the policy network.
@@ -164,9 +167,10 @@ for game = 1, opt.epochs do
                 actions = seqAct:byte()
             })
             -- We get a batch of training data to train the model.
-            local inputs, targets = memory.getBatch(batch, nbActions, nbStates, nSeq, x)
+            local inputs, targets, RNNhBatch = memory.getBatch(
+               batch, nbActions, nbStates, nSeq, x, predOpt)
             -- Train the network which returns the error.
-            err = err + trainNetwork(model, RNNh0Batch, inputs, targets, criterion, sgdParams, nSeq, nbActions, batch)
+            err = err + trainNetwork(model, RNNhBatch, inputs, targets, criterion, sgdParams, nSeq, nbActions, batch)
         end
         -- Update the current state and if the game is over:
         currentState = nextState
