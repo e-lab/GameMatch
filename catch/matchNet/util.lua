@@ -158,5 +158,9 @@ function getInput(seq, height, width, L, channels, mode)
 
    return x[1], y
 end
+function resize(im)
+   out = image.scale(img, opt.gridSize, opt.gridSize)
+  return out
+end
 
 return logger

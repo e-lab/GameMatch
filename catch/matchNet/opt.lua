@@ -5,7 +5,7 @@ function o.parse(arg)
    local opt = lapp [[
 
      Game options:
-     --gridSize            (default 10)          game grid size
+     --gridSize            (default 8)          game grid size
      --ch                  (default 1)          game grid size
      --discount            (default 0.9)         discount factor in learning
      --epsilon             (default 1)           initial value of ϵ-greedy action selection

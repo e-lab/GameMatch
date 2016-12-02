@@ -49,8 +49,8 @@ local predOpt = {
    layers = opt.nLayers, seq = nSeq, height = hi, width = wi, saveGraph = false,
    channels = {ch}, K = nbActions
 }
-for i = 1, predOpt.layers do
-   predOpt.channels[i+1] = 2^(i+3)
+for l = 2, opt.nLayers + 1 do
+   predOpt.channels[l] = 2^(l +  3)
 end
 local prednet = require 'models/prednet'
 -- Initialize model generator
@@ -129,9 +129,9 @@ for game = 1, opt.epochs do
     -- rest RNN to intial state:
     for i=1, #RNNh0Proto do
        if opt.useGPU then
-          RNNhProto[i] = RNNh0Proto[i]:cuda()
+          RNNhProto[i] = RNNh0Proto[i]:cuda():clone()
        else
-          RNNhProto[i] = RNNh0Proto[i]
+          RNNhProto[i] = RNNh0Proto[i]:clone()
        end
     end
     while not isGameOver do
@@ -144,9 +144,11 @@ for game = 1, opt.epochs do
        for i =1 , #q do
           if i == 1 then
              -- This is defined in the model code
-             RNNhProto[i] = torch.zeros(predOpt.channels[predOpt.layers+1], predOpt.height/2, predOpt.width/2)
+             RNNhProto[i] = torch.zeros(
+             predOpt.channels[predOpt.layers+1],
+             predOpt.height/2^(opt.nLayers), predOpt.width/2^(opt.nLayers))
           else
-             RNNhProto[i] = q[i]
+             RNNhProto[i] = q[i]:clone()
           end
        end
        if opt.useGPU then
