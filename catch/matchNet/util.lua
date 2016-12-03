@@ -76,8 +76,8 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
     local loss = 0
     local x, gradParameters = model:getParameters()
 
-     model:zeroGradParameters()
     local function feval(x_new)
+        gradParameters:zero()
         inputs = {inputs, table.unpack(state)} -- attach states
         if opt.useGPU then
            for i = 1 , #inputs do inputs[i] = inputs[i]:cuda() end
@@ -93,6 +93,7 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
         predictions = predictions:transpose(2,1)
         -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
         local loss = criterion:forward(predictions, targets)
+        model:zeroGradParameters()
         local grOut = criterion:backward(predictions, targets)
         grOut = grOut:transpose(2,1)
         local gradOutput = {}

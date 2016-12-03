@@ -80,6 +80,7 @@ function trainNetwork(model, state, inputs, targets, criterion, sgdParams, nSeq,
         predictions = predictions:transpose(2,1)
         -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
         local loss = criterion:forward(predictions, targets)
+        model:zeroGradParameters()
         local grOut = criterion:backward(predictions, targets)
         grOut = grOut:transpose(2,1)
         local gradOutput = tensor2Table(grOut, 1, state)
