@@ -34,7 +34,7 @@ local test_episodes_per_epoch = 100
 
 -- Other parameters
 local frame_repeat = 12
-local resolution = {30, 45}
+local resolution = {30, 45} -- Y, X sizes of rescaled state / game screen
 local episodes_to_watch = 10
 
 local model_savefile = "results/model.net"
@@ -62,8 +62,8 @@ end
 local memory = {}
 local function ReplayMemory(capacity)
     local channels = 1
-    memory.s1 = torch.zeros(capacity, resolution[1], resolution[2], channels)
-    memory.s2 = torch.zeros(capacity, resolution[1], resolution[2], channels)
+    memory.s1 = torch.zeros(capacity, channels, resolution[1], resolution[2])
+    memory.s2 = torch.zeros(capacity, channels, resolution[1], resolution[2])
     memory.a = torch.zeros(capacity)
     memory.r = torch.zeros(capacity)
     memory.isterminal = torch.zeros(capacity)
@@ -73,10 +73,10 @@ local function ReplayMemory(capacity)
     memory.pos = 1
 
     function memory.addTransition(s1, action, s2, isterminal, reward)
-        memory.s1[{memory.pos, {}, {}, 1}] = s1
+        memory.s1[{memory.pos, 1, {}, {}}] = s1
         memory.a[memory.pos] = action
         if not isterminal then
-            memory.s2[{memory.pos, {}, {}, 1}] = s2
+            memory.s2[{memory.pos, 1, {}, {}}] = s2
         end
         memory.isterminal[memory.pos] = isterminal and 1 or 0
         memory.r[memory.pos] = reward
@@ -93,7 +93,7 @@ local function ReplayMemory(capacity)
 
 end
 
-
+local model
 function createNetwork(available_actions_count)
     -- Create the input variables
     -- Add 2 convolutional layers with ReLu activation
@@ -127,10 +127,10 @@ function createNetwork(available_actions_count)
     model:add(nn.ReLU())
     model:add(nn.SpatialConvolution(8,8,3,3,2,2))
     model:add(nn.ReLU())
-    -- model:add(nn.View(8*6*6))
-    -- model:add(nn.Linear(8*6*6, 128))
-    -- model:add(nn.ReLU())
-    -- model:add(nn.Linear(128, available_actions_count))
+    model:add(nn.View(8*4*6))
+    model:add(nn.Linear(8*4*6, 128))
+    model:add(nn.ReLU())
+    model:add(nn.Linear(128, available_actions_count))
 
     function functionLearn(s1, target_q)
         feed_dict = {s1_=s1, target_q_=target_q}
@@ -140,6 +140,7 @@ function createNetwork(available_actions_count)
 
     function functionGetQValues(state)
         -- return session.run(q, feed_dict={s1_=state})
+        return model:forward(state)
     end
 
     function functionGetBestAction(state)
@@ -162,7 +163,7 @@ function learnFromMemory()
         s1, a, s2, isterminal, r = memory.getSample(batch_size)
 
         q2 = torch.max(getQValues(s2), 1)
-        target_q = get_q_values(s1)
+        target_q = getQValues(s1)
         -- target differs from q only for the selected action. The following means:
         -- target_Q(s,a) = r + gamma * max Q(s2,_) if isterminal else r
         -- target_q[np.arange(target_q.shape[0]), a] = r + discount_factor * (1 - isterminal) * q2
