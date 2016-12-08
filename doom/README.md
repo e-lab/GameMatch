@@ -51,6 +51,26 @@ https://github.com/Marqt/ViZDoom/issues/144
 etc.
 
 
+# Torch7 lua bindings OS X
+
+If you want to build against luajit installed locally by torch (as in http://torch.ch/docs/getting-started.html#_), please do:
+```
+cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON=OFF -DBUILD_LUA=ON -DLUA_EXECUTABLE=/Users/eugenioculurciello/torch/bin/luajit -DLUA_LIBRARIES=/Users/eugenioculurciello/torch/install/lib/libluajit.dylib -DLUA_INCLUDE_DIR=/Users/eugenioculurciello/torch/install/include/
+```
+Then manually copied folder: 
+
+/Users/eugenioculurciello/Desktop/ViZDoom/bin/lua/vizdoom
+
+to:
+
+/Users/eugenioculurciello/torch/install/lib/
+
+and
+
+/Users/eugenioculurciello/torch/install/share/lua/5.1 
+
+
+
 ## OS X SDL issue:
 
 I was getting this error on my OS X machine:
