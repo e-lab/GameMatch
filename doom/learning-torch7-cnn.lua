@@ -309,7 +309,7 @@ function main()
                 train_scores:mean(), train_scores:std(), train_scores:min(), train_scores:max()))
             print('Epsilon value', epsilon)
 
-            print(color.red.."\nTesting...")
+            print(colors.red.."\nTesting...")
             local test_episode = {}
             local test_scores = {}
             for test_episode=1, opt.testEpisodesEpoch do
