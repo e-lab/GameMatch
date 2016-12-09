@@ -1,7 +1,7 @@
 #!/usr/bin/env th
--- learning-torch7-rnn.lua
+
 -- E. Culurciello, December 2016
--- based on learning tensorflow
+-- based on https://github.com/Marqt/ViZDoom/blob/master/examples/python/learning_tensorflow.py
 
 local base_path="/Users/eugenioculurciello/Desktop/ViZDoom/"
 package.path = package.path .. ";"..base_path.."lua/vizdoom/?.lua"
@@ -10,10 +10,41 @@ require "nn"
 require "torch"
 require "sys"
 require "image"
+require "optim"
 
-local opt = {}
-opt.threads = 8
-opt.seed = 1
+require 'pl'
+lapp = require 'pl.lapp'
+opt = lapp [[
+  
+  Game options:
+  --gridSize            (default 10)          state is screen resized to this size 
+  --discount            (default 0.9)         discount factor in learning
+  --epsilon             (default 1)           initial value of ϵ-greedy action selection
+  --epsilonMinimumValue (default 0.05)        final value of ϵ-greedy action selection
+  --nbActions           (default 3)           catch number of actions
+  
+  Training parameters:
+  --threads               (default 8)        number of threads used by BLAS routines
+  --seed                  (default 1)        initial random seed
+  -r,--learningRate       (default 0.1)      learning rate
+  -d,--learningRateDecay  (default 1e-9)     learning rate decay
+  -w,--weightDecay        (default 0)        L2 penalty on the weights
+  -m,--momentum           (default 0.9)      momentum parameter
+  --batchSize             (default 32)       batch size for training
+  --maxMemory             (default 1e3)      Experience Replay buffer memory
+  --epochs                (default 20)       number of training steps to perform
+  
+  Model parameters:
+  --modelType             (default 'mlp')    neural net model type: cnn, mlp
+  --nHidden               (default 128)      hidden states in neural net
+
+  Display and save parameters:
+  --zoom                  (default 4)        zoom window
+  -v, --verbose           (default 2)        verbose output
+  --display                                  display stuff
+  --savedir          (default './results')   subdirectory to save experiments in
+  --progFreq              (default 1e2)      frequency of progress output
+]]
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -21,8 +52,8 @@ torch.manualSeed(opt.seed)
 
 -- Q-learning settings
 local learning_rate = 0.00025
-local discount_factor = 0.99
-local epochs = 20
+local discount_factor = opt.discount
+local epochs = opt.epochs
 local learning_steps_per_epoch = 2000
 local replay_memory_size = 10000
 
@@ -93,35 +124,9 @@ local function ReplayMemory(capacity)
 
 end
 
-local model
+local model, criterion
 function createNetwork(available_actions_count)
-    -- Create the input variables
-    -- Add 2 convolutional layers with ReLu activation
-    -- conv1 = tf.contrib.layers.convolution2d(s1_, num_outputs=8, kernel_size=[6, 6], stride=[3, 3],
-    --                                        activation_fn=tf.nn.relu,
-    --                                        weights_initializer=tf.contrib.layers.xavier_initializer_conv2d(),
-    --                                        biases_initializer=tf.constant_initializer(0.1))
-    -- conv2 = tf.contrib.layers.convolution2d(conv1, num_outputs=8, kernel_size=[3, 3], stride=[2, 2],
-    --                                        activation_fn=tf.nn.relu,
-    --                                        weights_initializer=tf.contrib.layers.xavier_initializer_conv2d(),
-    --                                        biases_initializer=tf.constant_initializer(0.1))
-    -- conv2_flat = tf.contrib.layers.flatten(conv2)
-    -- fc1 = tf.contrib.layers.fully_connected(conv2_flat, num_outputs=128, activation_fn=tf.nn.relu,
-                                            -- weights_initializer=tf.contrib.layers.xavier_initializer(),
-                                            -- biases_initializer=tf.constant_initializer(0.1))
-
-    -- q = tf.contrib.layers.fully_connected(fc1, num_outputs=available_actions_count, activation_fn=None,
-                                          -- weights_initializer=tf.contrib.layers.xavier_initializer(),
-                                          -- biases_initializer=tf.constant_initializer(0.1))
-    -- best_a = tf.argmax(q, 1)
-
-    -- loss = tf.contrib.losses.mean_squared_error(q, target_q_)
-    -- loss = nn.MSECriterion()
-
-    -- optimizer = tf.train.RMSPropOptimizer(learning_rate)
-    -- Update the parameters according to the computed gradient using RMSProp.
-    -- train_step = optimizer.minimize(loss)
-
+    -- create CNN model:
     model = nn.Sequential()
     model:add(nn.SpatialConvolution(1,8,6,6,3,3))
     model:add(nn.ReLU())
@@ -132,26 +137,37 @@ function createNetwork(available_actions_count)
     model:add(nn.ReLU())
     model:add(nn.Linear(128, available_actions_count))
 
+    criterion = nn.MSECriterion()
+
     function functionLearn(s1, target_q)
-        feed_dict = {s1_=s1, target_q_=target_q}
-        -- l, _ = session.run([loss, train_step], feed_dict=feed_dict)
-        return l
+
+        local params, gradParams = model:getParameters()
+        
+        local function feval(x_new)
+            gradParams:zero()
+            local predictions = model:forward(s1)
+            local loss = criterion:forward(predictions, target_q)
+            local gradOutput = criterion:backward(predictions, target_q)
+            model:backward(s1, gradOutput)
+            return loss, gradParams
+        end
+
+        local _, fs = optim.sgd(feval, params, sgdParams)
+        return fs[1] -- loss
     end
 
     function functionGetQValues(state)
-        -- return session.run(q, feed_dict={s1_=state})
         return model:forward(state)
     end
 
     function functionGetBestAction(state)
-        return 2--session.run(best_a, feed_dict={s1_=state})
+        local q = functionGetQValues(state:float():reshape(1, 1, resolution[1], resolution[2]))
+        local max, index = torch.max(q, 1)
+        local action = index[1]
+        return action
     end
 
-    function functionSimpleGetBestAction(state)
-        return 2-- return function_get_best_action(state.reshape([1, resolution[0], resolution[1], 1]))[0]
-    end
-
-    return functionLearn, functionGetQValues, functionSimpleGetBestAction
+    return functionLearn, functionGetQValues, functionGetBestAction
 end
 
 function learnFromMemory()
@@ -201,7 +217,7 @@ function performLearningStep(epoch)
         a = torch.random(1, #actions)
     else
         -- Choose the best action according to the network:
-        a = get_best_action(s1)
+        a = getBestAction(s1)
     end
     reward = game:makeAction(actions[a], frame_repeat)
 
@@ -221,7 +237,7 @@ function initialize_vizdoom(config_file_path)
     game:setViZDoomPath(base_path.."bin/vizdoom")
     game:setDoomGamePath(base_path.."scenarios/freedoom2.wad")
     game:loadConfig(config_file_path)
-    game:setWindowVisible(false)
+    -- game:setWindowVisible(false)
     game:setMode(vizdoom.Mode.PLAYER)
     game:setScreenFormat(vizdoom.ScreenFormat.GRAY8)
     game:setScreenResolution(vizdoom.ScreenResolution.RES_640X480)
