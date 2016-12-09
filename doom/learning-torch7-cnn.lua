@@ -179,16 +179,17 @@ function learnFromMemory()
     -- Get a random minibatch from the replay memory and learns from it
     if memory.size > opt.batchSize then
         local s1, a, s2, isterminal, r = memory.getSample(opt.batchSize)
+        r = r:clamp(-1,1) -- NOTE: clamping of reward!
 
         local q2 = torch.max(getQValues(s2), 2) -- get max q for each sample of batch
-        local target_q = getQValues(s1)
+        local target_q = getQValues(s1):clone()
+        local targetq0 = target_q:clone()
 
         -- target differs from q only for the selected action. The following means:
         -- target_Q(s,a) = r + gamma * max Q(s2,_) if isterminal else r
         -- target_q[np.arange(target_q.shape[0]), a] = r + discount_factor * (1 - isterminal) * q2
         for i=1,opt.batchSize do
             if a[i]>0  then 
-                -- print(i) print(a[i])  print(target_q[i][a[i]]) print(r[i]) print(isterminal[i]) print(q2[i])
                 target_q[i][a[i]] = r[i] + opt.discount * (1 - isterminal[i]) * q2[i] 
             end
         end
