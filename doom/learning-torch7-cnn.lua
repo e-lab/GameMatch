@@ -38,15 +38,9 @@ opt = lapp [[
   --frameRepeat           (default 12)       repeat frame in test mode
   --episodesWatch         (default 10)       episodes to watch after training
   
-  Model parameters:
-  --modelType             (default 'mlp')    neural net model type: cnn, mlp
-  --nHidden               (default 128)      hidden states in neural net
-
   Display and save parameters:
-  --zoom                  (default 4)        zoom window
-  -v, --verbose           (default 2)        verbose output
   --display                                  display stuff
-  --savedir          (default './results')   subdirectory to save experiments in
+  --saveDir          (default './results')   subdirectory to save experiments in
 ]]
 
 torch.setnumthreads(opt.threads)
@@ -60,7 +54,7 @@ local model_savefile = "results/model.net"
 local save_model = true
 local load_model = false
 local skip_learning = false
-local color = sys.COLORS
+local colors = sys.COLORS
 
  -- Configuration file path
 local config_file_path = base_path.."scenarios/simpler_basic.cfg"
@@ -254,7 +248,7 @@ function initialize_vizdoom(config_file_path)
     game:setViZDoomPath(base_path.."bin/vizdoom")
     game:setDoomGamePath(base_path.."scenarios/freedoom2.wad")
     game:loadConfig(config_file_path)
-    game:setWindowVisible(false)
+    game:setWindowVisible(opt.display)
     game:setMode(vizdoom.Mode.PLAYER)
     game:setScreenFormat(vizdoom.ScreenFormat.GRAY8)
     game:setScreenResolution(vizdoom.ScreenResolution.RES_640X480)
@@ -293,7 +287,7 @@ function main()
             train_episodes_finished = 0
             train_scores = {}
 
-            print("Training...")
+            print(colors.red.."Training...")
             game:newEpisode()
             for learning_step=1, opt.learningStepsEpoch do
                 xlua.progress(learning_step, opt.learningStepsEpoch)
@@ -314,7 +308,7 @@ function main()
                 train_scores:mean(), train_scores:std(), train_scores:min(), train_scores:max()))
             print('Epsilon value', epsilon)
 
-            print("\nTesting...")
+            print(color.red.."\nTesting...")
             local test_episode = {}
             local test_scores = {}
             for test_episode=1, opt.testEpisodesEpoch do
@@ -334,10 +328,10 @@ function main()
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 test_scores:mean(), test_scores:std(), test_scores:min(), test_scores:max()))
 
-            print(c.green.."Saving the network weigths to:", model_savefile)
-            -- torch.save(model_savefile, model)
+            print(colors.green.."Saving the network weigths to:", model_savefile)
+            -- torch.save(opt.saveDir..'/model.net', model:float():clearState())
             
-            print(string.format(c.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
         end
     end
     
