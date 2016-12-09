@@ -5,12 +5,13 @@
 
 local base_path="/Users/eugenioculurciello/Desktop/ViZDoom/"
 package.path = package.path .. ";"..base_path.."lua/vizdoom/?.lua"
-require "vizdoom.init"
-require "nn"
-require "torch"
-require "sys"
-require "image"
-require "optim"
+require 'vizdoom.init'
+require 'nn'
+require 'torch'
+require 'sys'
+require 'image'
+require 'optim'
+require 'xlua'
 
 require 'pl'
 lapp = require 'pl.lapp'
@@ -177,20 +178,19 @@ function createNetwork(available_actions_count)
 end
 
 function learnFromMemory()
-    -- Learns from a single transition (making use of replay memory).
+    -- Learns from a single transition (making use of replay memory)
     -- s2 is ignored if s2_isterminal
 
-    -- Get a random minibatch from the replay memory and learns from it.
+    -- Get a random minibatch from the replay memory and learns from it
     if memory.size > opt.batchSize then
-        s1, a, s2, isterminal, r = memory.getSample(opt.batchSize)
+        local s1, a, s2, isterminal, r = memory.getSample(opt.batchSize)
 
-        q2 = torch.max(getQValues(s2), 2) -- get max q for each sample of batch
-        target_q = getQValues(s1)
+        local q2 = torch.max(getQValues(s2), 2) -- get max q for each sample of batch
+        local target_q = getQValues(s1)
 
         -- target differs from q only for the selected action. The following means:
         -- target_Q(s,a) = r + gamma * max Q(s2,_) if isterminal else r
         -- target_q[np.arange(target_q.shape[0]), a] = r + discount_factor * (1 - isterminal) * q2
-
         for i=1,opt.batchSize do
             if a[i]>0  then 
                 -- print(i) print(a[i])  print(target_q[i][a[i]]) print(r[i]) print(isterminal[i]) print(q2[i])
@@ -207,10 +207,10 @@ function performLearningStep(epoch)
 
     function explorationRate(epoch)
         --  Define exploration rate change over time
-        start_eps = opt.epsilon
-        end_eps = opt.epsilonMinimumValue
-        const_eps_epochs = 0.1 * opt.epochs  -- 10% of learning time
-        eps_decay_epochs = 0.6 * opt.epochs  -- 60% of learning time
+        local start_eps = opt.epsilon
+        local end_eps = opt.epsilonMinimumValue
+        local const_eps_epochs = 0.1 * opt.epochs  -- 10% of learning time
+        local eps_decay_epochs = 0.6 * opt.epochs  -- 60% of learning time
 
         if epoch < const_eps_epochs then
             return start_eps
@@ -223,19 +223,19 @@ function performLearningStep(epoch)
         end
     end
 
-    s1 = preprocess(game:getState().screenBuffer)
+    local s1 = preprocess(game:getState().screenBuffer)
 
     -- With probability eps make a random action:
-    eps = explorationRate(epoch)
+    local eps = explorationRate(epoch)
     if torch.uniform() <= eps then
         a = torch.random(1, #actions)
     else
         -- Choose the best action according to the network:
         a = getBestAction(s1)
     end
-    reward = game:makeAction(actions[a], opt.frameRepeat)
+    local reward = game:makeAction(actions[a], opt.frameRepeat)
 
-    isterminal = game:isEpisodeFinished()
+    local isterminal = game:isEpisodeFinished()
     if not isterminal then s2 = preprocess(game:getState().screenBuffer) else s2 = nil end
 
     -- Remember the transition that was just experienced:
@@ -262,16 +262,16 @@ end
 
 function main()
     -- Create Doom instance
-    game = initialize_vizdoom(config_file_path)
+    local game = initialize_vizdoom(config_file_path)
 
     -- Action = which buttons are pressed
-    n = game:getAvailableButtonsSize()
+    local n = game:getAvailableButtonsSize()
     -- actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
     -- Create replay memory which will store the 
     ReplayMemory(opt.maxMemory)
 
-    learn, getQValues, getBestAction = createNetwork(#actions)
+    learn, getQValues, getBestAction = createNetwork(#actions) -- note: global functions!
     
     if load_model then
         print("Loading model from: ", model_savefile)
@@ -282,7 +282,7 @@ function main()
     end
     print("Starting the training!")
 
-    time_start = sys.tic()
+    local time_start = sys.tic()
     if not skip_learning then
         for epoch = 1, opt.epochs do
             print(string.format("\nEpoch %d\n-------", epoch))
@@ -292,6 +292,7 @@ function main()
             print("Training...")
             game:newEpisode()
             for learning_step=1, opt.learningStepsEpoch do
+                xlua.progress(learning_step, opt.learningStepsEpoch)
                 performLearningStep(epoch)
                 if game:isEpisodeFinished() then
                     score = game:getTotalReward()
@@ -309,9 +310,10 @@ function main()
                 train_scores:mean(), train_scores:std(), train_scores:min(), train_scores:max()))
 
             print("\nTesting...")
-            test_episode = {}
-            test_scores = {}
+            local test_episode = {}
+            local test_scores = {}
             for test_episode=1, opt.testEpisodesEpoch do
+                xlua.progress(test_episode, opt.testEpisodesEpoch)
                 game:newEpisode()
                 while not game:isEpisodeFinished() do
                     state = preprocess(game:getState().screenBuffer)
@@ -346,8 +348,8 @@ function main()
     for i = 1, opt.episodesWatch do
         game:newEpisode()
         while not game:isEpisodeFinished() do
-            state = preprocess(game:getState().screenBuffer)
-            best_action_index = getBestAction(state)
+            local state = preprocess(game:getState().screenBuffer)
+            local best_action_index = getBestAction(state)
 
             -- Instead of make_action(a, frame_repeat) in order to make the animation smooth
             game:makeAction(actions[best_action_index])
@@ -358,7 +360,7 @@ function main()
 
         -- Sleep between episodes:
         sys.sleep(1)
-        score = game:getTotalReward()
+        local score = game:getTotalReward()
         print("Total score: ", score)
     end
     game:close()
