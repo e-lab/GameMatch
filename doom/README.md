@@ -69,27 +69,3 @@ and
 
 /Users/eugenioculurciello/torch/install/share/lua/5.1 
 
-
-
-## OS X SDL issue:
-
-I was getting this error on my OS X machine:
-
-```
-Scanning dependencies of target vizdoom
-[ 35%] Building CXX object src/vizdoom/src/CMakeFiles/vizdoom.dir/__autostart.cpp.o
-[ 36%] Building C object src/vizdoom/src/CMakeFiles/vizdoom.dir/posix/sdl/crashcatcher.c.o
-[ 36%] Building CXX object src/vizdoom/src/CMakeFiles/vizdoom.dir/posix/sdl/hardware.cpp.o
-/Users/eugenioculurciello/Desktop/ViZDoom-master/src/vizdoom/src/posix/sdl/hardware.cpp:83:37: error: use of undeclared identifier
-      'SDL_GetCurrentVideoDriver'
-                Printf("Using video driver %s\n", SDL_GetCurrentVideoDriver());
-                                                  ^
-1 error generated.
-make[2]: *** [src/vizdoom/src/CMakeFiles/vizdoom.dir/posix/sdl/hardware.cpp.o] Error 1
-make[1]: *** [src/vizdoom/src/CMakeFiles/vizdoom.dir/all] Error 2
-make: *** [all] Error 2```
-
-I went into: ViZDoom-master/src/vizdoom/src/posix/sdl/
-and changed all references:
-
-`#include <SDL.h> to #include <SDL2/SDL.h>`
