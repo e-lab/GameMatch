@@ -18,9 +18,9 @@ lapp = require 'pl.lapp'
 opt = lapp [[
 
   Game options:
-  --discount            (default 0.99)        discount factor in learning
-  --epsilon             (default 1)           initial value of ϵ-greedy action selection
-  --epsilonMinimumValue (default 0.1)         final value of ϵ-greedy action selection
+  --discount            (default 0.99)       discount factor in learning
+  --epsilon             (default 1)          initial value of ϵ-greedy action selection
+  --epsilonMinimumValue (default 0.1)        final value of ϵ-greedy action selection
   
   Training parameters:
   --threads               (default 8)        number of threads used by BLAS routines
@@ -31,12 +31,12 @@ opt = lapp [[
   --epochs                (default 20)       number of training steps to perform
 
   -- Q-learning settings
-  --learningStepsEpoch    (default 2000)    Learning steps per epoch
+  --learningStepsEpoch    (default 2000)     Learning steps per epoch
 
   -- Training regime
-  --testEpisodesEpoch     (default 100)     test episodes per epoch
-  --frameRepeat           (default 12)      repeat frame in test mode
-  --episodesWatch         (default 10)      episodes to watch after training
+  --testEpisodesEpoch     (default 100)      test episodes per epoch
+  --frameRepeat           (default 12)       repeat frame in test mode
+  --episodesWatch         (default 10)       episodes to watch after training
   
   Model parameters:
   --modelType             (default 'mlp')    neural net model type: cnn, mlp
@@ -114,13 +114,13 @@ local function ReplayMemory(capacity)
 
     function memory.getSample(sampleSize)
         -- i = sample(range(0, memory.size), sampleSize) -- in python this is compact!
-        local perms = torch.randperm(memory.size)
         for i=1,sampleSize do
-            memory.bs1[i] = memory.s1[perms[i]]
-            memory.bs2[i] = memory.s2[perms[i]]
-            memory.ba[i] = memory.a[perms[i]]
-            memory.bisterminal[i] = memory.isterminal[perms[i]]
-            memory.br[i] = memory.r[perms[i]]
+            local ri = torch.random(1, memory.size)
+            memory.bs1[i] = memory.s1[ri]
+            memory.bs2[i] = memory.s2[ri]
+            memory.ba[i] = memory.a[ri]
+            memory.bisterminal[i] = memory.isterminal[ri]
+            memory.br[i] = memory.r[ri]
         end
         return memory.bs1, memory.ba, memory.bs2, memory.bisterminal, memory.br
     end
