@@ -223,7 +223,7 @@ function performLearningStep(epoch)
         end
     end
 
-    local s1 = preprocess(game:getState().screenBuffer)
+    local s1 = preprocess(game:getState().screenBuffer):float():div(255)
 
     -- With probability eps make a random action:
     local eps = explorationRate(epoch)
@@ -236,7 +236,7 @@ function performLearningStep(epoch)
     local reward = game:makeAction(actions[a], opt.frameRepeat)
 
     local isterminal = game:isEpisodeFinished()
-    if not isterminal then s2 = preprocess(game:getState().screenBuffer) else s2 = nil end
+    if not isterminal then s2 = preprocess(game:getState().screenBuffer):float():div(255) else s2 = nil end
 
     -- Remember the transition that was just experienced:
     memory.addTransition(s1, a, s2, isterminal, reward)
