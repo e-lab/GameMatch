@@ -242,6 +242,8 @@ function performLearningStep(epoch)
     memory.addTransition(s1, a, s2, isterminal, reward)
 
     learnFromMemory()
+
+    return eps
 end
 
 -- Creates and initializes ViZDoom environment.
@@ -284,6 +286,7 @@ function main()
 
     local time_start = sys.tic()
     if not skip_learning then
+        local epsilon
         for epoch = 1, opt.epochs do
             print(string.format("\nEpoch %d\n-------", epoch))
             train_episodes_finished = 0
@@ -293,7 +296,7 @@ function main()
             game:newEpisode()
             for learning_step=1, opt.learningStepsEpoch do
                 xlua.progress(learning_step, opt.learningStepsEpoch)
-                performLearningStep(epoch)
+                epsilon = performLearningStep(epoch)
                 if game:isEpisodeFinished() then
                     score = game:getTotalReward()
                     table.insert(train_scores, score)
@@ -308,6 +311,7 @@ function main()
 
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
                 train_scores:mean(), train_scores:std(), train_scores:min(), train_scores:max()))
+            print('Epsilon value', epsilon)
 
             print("\nTesting...")
             local test_episode = {}
