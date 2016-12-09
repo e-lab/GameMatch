@@ -15,24 +15,27 @@ require "optim"
 require 'pl'
 lapp = require 'pl.lapp'
 opt = lapp [[
-  
+
   Game options:
-  --gridSize            (default 10)          state is screen resized to this size 
-  --discount            (default 0.9)         discount factor in learning
+  --discount            (default 0.99)        discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
-  --epsilonMinimumValue (default 0.05)        final value of ϵ-greedy action selection
-  --nbActions           (default 3)           catch number of actions
+  --epsilonMinimumValue (default 0.1)         final value of ϵ-greedy action selection
   
   Training parameters:
   --threads               (default 8)        number of threads used by BLAS routines
   --seed                  (default 1)        initial random seed
-  -r,--learningRate       (default 0.1)      learning rate
-  -d,--learningRateDecay  (default 1e-9)     learning rate decay
-  -w,--weightDecay        (default 0)        L2 penalty on the weights
-  -m,--momentum           (default 0.9)      momentum parameter
-  --batchSize             (default 32)       batch size for training
-  --maxMemory             (default 1e3)      Experience Replay buffer memory
+  -r,--learningRate       (default 0.00025)  learning rate
+  --batchSize             (default 64)       batch size for training
+  --maxMemory             (default 1e4)      Experience Replay buffer memory
   --epochs                (default 20)       number of training steps to perform
+
+  -- Q-learning settings
+  --learningStepsEpoch    (default 2000)    Learning steps per epoch
+
+  -- Training regime
+  --testEpisodesEpoch     (default 100)     test episodes per epoch
+  --frameRepeat           (default 12)      repeat frame in test mode
+  --episodesWatch         (default 10)      episodes to watch after training
   
   Model parameters:
   --modelType             (default 'mlp')    neural net model type: cnn, mlp
@@ -43,30 +46,14 @@ opt = lapp [[
   -v, --verbose           (default 2)        verbose output
   --display                                  display stuff
   --savedir          (default './results')   subdirectory to save experiments in
-  --progFreq              (default 1e2)      frequency of progress output
 ]]
 
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 
--- Q-learning settings
-local learning_rate = 0.00025
-local discount_factor = opt.discount
-local epochs = opt.epochs
-local learning_steps_per_epoch = 2000
-local replay_memory_size = 10000
-
--- NN learning settings
-local batch_size = 64
-
--- Training regime
-local test_episodes_per_epoch = 100
-
 -- Other parameters
-local frame_repeat = 12
 local resolution = {30, 45} -- Y, X sizes of rescaled state / game screen
-local episodes_to_watch = 10
 
 local model_savefile = "results/model.net"
 local save_model = true
@@ -79,9 +66,9 @@ local config_file_path = base_path.."scenarios/simpler_basic.cfg"
 -- config_file_path = "../../scenarios/basic.cfg"
 
 local actions = {
-    [1] = torch.IntTensor({1,0,0}),
-    [2] = torch.IntTensor({0,1,0}),
-    [3] = torch.IntTensor({0,0,1})
+    [1] = torch.Tensor({1,0,0}),
+    [2] = torch.Tensor({0,1,0}),
+    [3] = torch.Tensor({0,0,1})
 }
 
 -- Converts and down-samples the input image
@@ -103,26 +90,45 @@ local function ReplayMemory(capacity)
     memory.size = 0
     memory.pos = 1
 
+    -- batch buffers:
+    memory.bs1 = torch.zeros(opt.batchSize, channels, resolution[1], resolution[2])
+    memory.bs2 = torch.zeros(opt.batchSize, channels, resolution[1], resolution[2])
+    memory.ba = torch.zeros(opt.batchSize)
+    memory.br = torch.zeros(opt.batchSize)
+    memory.bisterminal = torch.zeros(opt.batchSize)
+
     function memory.addTransition(s1, action, s2, isterminal, reward)
         memory.s1[{memory.pos, 1, {}, {}}] = s1
         memory.a[memory.pos] = action
         if not isterminal then
             memory.s2[{memory.pos, 1, {}, {}}] = s2
         end
-        memory.isterminal[memory.pos] = isterminal and 1 or 0
+        memory.isterminal[memory.pos] = isterminal and 1 or 0 -- boolean stored as 0 or 1 in memory!
         memory.r[memory.pos] = reward
 
         memory.pos = (memory.pos + 1) % memory.capacity
+        if memory.pos == 0 then memory.pos = 1 end -- to prevent issues!
         memory.size = math.min(memory.size + 1, memory.capacity)
     end
 
-    function memory.getSample(sample_size)
-        -- i = sample(range(0, memory.size), sample_size)
-        i = torch.random(1, memory.size)
-        return memory.s1[i], memory.a[i], memory.s2[i], memory.isterminal[i], memory.r[i]
+    function memory.getSample(sampleSize)
+        -- i = sample(range(0, memory.size), sampleSize) -- in python this is compact!
+        local perms = torch.randperm(memory.size)
+        for i=1,sampleSize do
+            memory.bs1[i] = memory.s1[perms[i]]
+            memory.bs2[i] = memory.s2[perms[i]]
+            memory.ba[i] = memory.a[perms[i]]
+            memory.bisterminal[i] = memory.isterminal[perms[i]]
+            memory.br[i] = memory.r[perms[i]]
+        end
+        return memory.bs1, memory.ba, memory.bs2, memory.bisterminal, memory.br
     end
 
 end
+
+local sgdParams = {
+    learningRate = opt.learningRate,
+}
 
 local model, criterion
 function createNetwork(available_actions_count)
@@ -152,7 +158,7 @@ function createNetwork(available_actions_count)
             return loss, gradParams
         end
 
-        local _, fs = optim.sgd(feval, params, sgdParams)
+        local _, fs = optim.rmsprop(feval, params, sgdParams)
         return fs[1] -- loss
     end
 
@@ -164,7 +170,7 @@ function createNetwork(available_actions_count)
         local q = functionGetQValues(state:float():reshape(1, 1, resolution[1], resolution[2]))
         local max, index = torch.max(q, 1)
         local action = index[1]
-        return action
+        return action, q
     end
 
     return functionLearn, functionGetQValues, functionGetBestAction
@@ -175,14 +181,22 @@ function learnFromMemory()
     -- s2 is ignored if s2_isterminal
 
     -- Get a random minibatch from the replay memory and learns from it.
-    if memory.size > batch_size then
-        s1, a, s2, isterminal, r = memory.getSample(batch_size)
+    if memory.size > opt.batchSize then
+        s1, a, s2, isterminal, r = memory.getSample(opt.batchSize)
 
-        q2 = torch.max(getQValues(s2), 1)
+        q2 = torch.max(getQValues(s2), 2) -- get max q for each sample of batch
         target_q = getQValues(s1)
+
         -- target differs from q only for the selected action. The following means:
         -- target_Q(s,a) = r + gamma * max Q(s2,_) if isterminal else r
         -- target_q[np.arange(target_q.shape[0]), a] = r + discount_factor * (1 - isterminal) * q2
+
+        for i=1,opt.batchSize do
+            if a[i]>0  then 
+                -- print(i) print(a[i])  print(target_q[i][a[i]]) print(r[i]) print(isterminal[i]) print(q2[i])
+                target_q[i][a[i]] = r[i] + opt.discount * (1 - isterminal[i]) * q2[i] 
+            end
+        end
         learn(s1, target_q)
     end
 end
@@ -193,10 +207,10 @@ function performLearningStep(epoch)
 
     function explorationRate(epoch)
         --  Define exploration rate change over time
-        start_eps = 1.0
-        end_eps = 0.1
-        const_eps_epochs = 0.1 * epochs  -- 10% of learning time
-        eps_decay_epochs = 0.6 * epochs  -- 60% of learning time
+        start_eps = opt.epsilon
+        end_eps = opt.epsilonMinimumValue
+        const_eps_epochs = 0.1 * opt.epochs  -- 10% of learning time
+        eps_decay_epochs = 0.6 * opt.epochs  -- 60% of learning time
 
         if epoch < const_eps_epochs then
             return start_eps
@@ -219,7 +233,7 @@ function performLearningStep(epoch)
         -- Choose the best action according to the network:
         a = getBestAction(s1)
     end
-    reward = game:makeAction(actions[a], frame_repeat)
+    reward = game:makeAction(actions[a], opt.frameRepeat)
 
     isterminal = game:isEpisodeFinished()
     if not isterminal then s2 = preprocess(game:getState().screenBuffer) else s2 = nil end
@@ -237,7 +251,7 @@ function initialize_vizdoom(config_file_path)
     game:setViZDoomPath(base_path.."bin/vizdoom")
     game:setDoomGamePath(base_path.."scenarios/freedoom2.wad")
     game:loadConfig(config_file_path)
-    -- game:setWindowVisible(false)
+    game:setWindowVisible(false)
     game:setMode(vizdoom.Mode.PLAYER)
     game:setScreenFormat(vizdoom.ScreenFormat.GRAY8)
     game:setScreenResolution(vizdoom.ScreenResolution.RES_640X480)
@@ -255,7 +269,7 @@ function main()
     -- actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
     -- Create replay memory which will store the 
-    ReplayMemory(replay_memory_size)
+    ReplayMemory(opt.maxMemory)
 
     learn, getQValues, getBestAction = createNetwork(#actions)
     
@@ -270,15 +284,14 @@ function main()
 
     time_start = sys.tic()
     if not skip_learning then
-        for epoch = 1, epochs do
+        for epoch = 1, opt.epochs do
             print(string.format("\nEpoch %d\n-------", epoch))
             train_episodes_finished = 0
             train_scores = {}
 
             print("Training...")
             game:newEpisode()
-            for learning_step = 1, learning_steps_per_epoch do
-                -- game:makeAction(actions[2]) -- to test
+            for learning_step=1, opt.learningStepsEpoch do
                 performLearningStep(epoch)
                 if game:isEpisodeFinished() then
                     score = game:getTotalReward()
@@ -292,26 +305,26 @@ function main()
 
             train_scores = torch.Tensor(train_scores)
 
-            print(string.format("Results: mean: %.1f+//-%.1f, min: %.1f, max: %.1f", 
+            print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
                 train_scores:mean(), train_scores:std(), train_scores:min(), train_scores:max()))
 
             print("\nTesting...")
             test_episode = {}
             test_scores = {}
-            for test_episode =1, test_episodes_per_epoch do
+            for test_episode=1, opt.testEpisodesEpoch do
                 game:newEpisode()
                 while not game:isEpisodeFinished() do
                     state = preprocess(game:getState().screenBuffer)
                     best_action_index = getBestAction(state)
                     
-                    game:makeAction(actions[best_action_index], frame_repeat)
+                    game:makeAction(actions[best_action_index], opt.frameRepeat)
                 end
                 r = game:getTotalReward()
                 table.insert(test_scores, r)
             end
 
             test_scores = torch.Tensor(test_scores)
-            print(string.format("Results: mean: %.1f+//-%.1f, min: %.1f, max: %.1f",
+            print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 test_scores:mean(), test_scores:std(), test_scores:min(), test_scores:max()))
 
             print("Saving the network weigths to:", model_savefile)
@@ -330,7 +343,7 @@ function main()
     game:setMode(vizdoom.Mode.ASYNC_PLAYER)
     game:init()
 
-    for i = 1, episodes_to_watch do
+    for i = 1, opt.episodesWatch do
         game:newEpisode()
         while not game:isEpisodeFinished() do
             state = preprocess(game:getState().screenBuffer)
@@ -338,12 +351,12 @@ function main()
 
             -- Instead of make_action(a, frame_repeat) in order to make the animation smooth
             game:makeAction(actions[best_action_index])
-            for j = 1, frame_repeat do
+            for j = 1, opt.frameRepeat do
                 game:advanceAction()
             end
         end
 
-        -- Sleep between episodes
+        -- Sleep between episodes:
         sys.sleep(1)
         score = game:getTotalReward()
         print("Total score: ", score)
