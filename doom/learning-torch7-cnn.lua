@@ -32,6 +32,7 @@ opt = lapp [[
 
   -- Q-learning settings
   --learningStepsEpoch    (default 2000)     Learning steps per epoch
+  --clampReward                              clamp reward to -1, 1
 
   -- Training regime
   --testEpisodesEpoch     (default 100)      test episodes per epoch
@@ -46,6 +47,7 @@ opt = lapp [[
 torch.setnumthreads(opt.threads)
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
+os.execute('mkdir '..opt.saveDir)
 
 -- Other parameters
 local resolution = {30, 45} -- Y, X sizes of rescaled state / game screen
@@ -330,7 +332,7 @@ function main()
                 test_scores:mean(), test_scores:std(), test_scores:min(), test_scores:max()))
 
             print(colors.green.."Saving the network weigths to:", model_savefile)
-            -- torch.save(opt.saveDir..'/model.net', model:float():clearState())
+            torch.save(opt.saveDir..'/model-'..epoch..'.net', model:float():clearState())
             
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
         end
