@@ -332,7 +332,7 @@ function main()
     print("======================================")
     print("Training finished. It's time to watch!")
 
-    -- Reinitialize the game with window visible
+    -- Reinitialize the game with window visible:
     game:setWindowVisible(true)
     game:setMode(vizdoom.Mode.ASYNC_PLAYER)
     game:init()
