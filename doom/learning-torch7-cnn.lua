@@ -60,6 +60,7 @@ local model_savefile = "results/model.net"
 local save_model = true
 local load_model = false
 local skip_learning = false
+local color = sys.COLORS
 
  -- Configuration file path
 local config_file_path = base_path.."scenarios/simpler_basic.cfg"
@@ -320,7 +321,7 @@ function main()
                 xlua.progress(test_episode, opt.testEpisodesEpoch)
                 game:newEpisode()
                 while not game:isEpisodeFinished() do
-                    state = preprocess(game:getState().screenBuffer)
+                    state = preprocess(game:getState().screenBuffer:float():div(255))
                     best_action_index = getBestAction(state)
                     
                     game:makeAction(actions[best_action_index], opt.frameRepeat)
@@ -333,10 +334,10 @@ function main()
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 test_scores:mean(), test_scores:std(), test_scores:min(), test_scores:max()))
 
-            print("Saving the network weigths to:", model_savefile)
+            print(c.green.."Saving the network weigths to:", model_savefile)
             -- torch.save(model_savefile, model)
             
-            print(string.format("Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            print(string.format(c.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
         end
     end
     
@@ -352,7 +353,7 @@ function main()
     for i = 1, opt.episodesWatch do
         game:newEpisode()
         while not game:isEpisodeFinished() do
-            local state = preprocess(game:getState().screenBuffer)
+            local state = preprocess(game:getState().screenBuffer:float():div(255))
             local best_action_index = getBestAction(state)
 
             -- Instead of make_action(a, frame_repeat) in order to make the animation smooth
