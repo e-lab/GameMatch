@@ -59,9 +59,9 @@ local skip_learning = false
 local colors = sys.COLORS
 
  -- Configuration file path
-local config_file_path = base_path.."scenarios/simpler_basic.cfg"
--- config_file_path = "../../scenarios/rocket_basic.cfg"
--- config_file_path = "../../scenarios/basic.cfg"
+-- local config_file_path = base_path.."scenarios/simpler_basic.cfg"
+local config_file_path = base_path.."scenarios/rocket_basic.cfg"
+-- local config_file_path = base_path.."scenarios/basic.cfg"
 
 local actions = {
     [1] = torch.Tensor({1,0,0}),
