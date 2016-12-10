@@ -36,8 +36,8 @@ function Memory(maxMemory, discount)
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
             local randomIndex = torch.random(1, memoryLength)
-            inputs[i] = memory[randomIndex].states:float() -- save as byte, use as float
-            targets[i]= memory[randomIndex].actions:float()
+            inputs[i] = memory[randomIndex].states
+            targets[i] = memory[randomIndex].actions
         end
         if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
 
@@ -104,7 +104,7 @@ function trainer.trainNetwork(model, state, inputs, targets, nSeq, nbActions)
         return loss, gradParameters
     end
 
-    local _, fs = optim.sgd(feval, x, sgdParams)
+    local _, fs = optim.sgd(feval, x, trainer.sgdParams)
     
     loss = loss + fs[1]
     return loss

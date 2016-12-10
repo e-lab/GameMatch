@@ -128,10 +128,7 @@ for game = 1, opt.epochs do
 
         if reward >= 1 then 
             winCount = winCount + 1 
-            memory.remember({
-                states = seqMem:byte(), -- save as byte, use as float
-                actions = seqAct:byte()
-            })
+            memory.remember( {states = seqMem:clone(), actions = seqAct:clone() })
             -- We get a batch of training data to train the model:
             local inputs, targets = memory.getBatch(opt.batchSize, nSeq, nbActions, nbStates)
             -- Train the network which returns the error:
