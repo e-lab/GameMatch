@@ -11,9 +11,9 @@ require 'image'
 torch.setnumthreads(8)
 torch.setdefaulttensortype('torch.FloatTensor')
 
-local opt = {...}
-opt.fpath = "results/model-10.net"--opt[1]
-if not opt.fpath then print('missing arg #1: missing network file to test!') return end
+local opt = {}
+opt.fpath = arg[1]
+if not opt.fpath then print('missing arg #1: th test.lua results/model-20.net') return end
 
 -- load trained network:
 local model = torch.load(opt.fpath)
