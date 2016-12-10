@@ -58,9 +58,9 @@ local load_model = false
 local skip_learning = false
 local colors = sys.COLORS
 
- -- Configuration file path
--- local config_file_path = base_path.."scenarios/simpler_basic.cfg"
-local config_file_path = base_path.."scenarios/rocket_basic.cfg"
+-- Configuration file path
+local config_file_path = base_path.."scenarios/simpler_basic.cfg"
+-- local config_file_path = base_path.."scenarios/rocket_basic.cfg"
 -- local config_file_path = base_path.."scenarios/basic.cfg"
 
 local actions = {

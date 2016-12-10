@@ -18,10 +18,9 @@ if not opt.fpath then print('missing arg #1: missing network file to test!') ret
 -- load trained network:
 local model = torch.load(opt.fpath)
 
- -- Doom configuration file path
 local config_file_path = base_path.."scenarios/simpler_basic.cfg"
--- config_file_path = "../../scenarios/rocket_basic.cfg"
--- config_file_path = "../../scenarios/basic.cfg"
+-- local config_file_path = base_path.."scenarios/rocket_basic.cfg"
+-- local config_file_path = base_path.."scenarios/basic.cfg"
 
 -- Doom game actions:
 local actions = {
