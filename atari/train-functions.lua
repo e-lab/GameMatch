@@ -5,6 +5,8 @@
 -- memory for experience replay:
 function Memory(maxMemory, discount)
     local memory
+    local binputs = torch.zeros(batchSize, nSeq, nbStates)
+    local btargets = torch.zeros(batchSize, nSeq, nbActions)
 
     if opt.playFile ~= '' then
         memory = torch.load(opt.playFile)
@@ -30,18 +32,15 @@ function Memory(maxMemory, discount)
         local memoryLength = #memory
         local chosenBatchSize = math.min(batchSize, memoryLength)
 
-        local inputs = torch.zeros(batchSize, nSeq, nbStates)
-        local targets = torch.zeros(batchSize, nSeq, nbActions)
-
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
             local randomIndex = torch.random(1, memoryLength)
-            inputs[i] = memory[randomIndex].states
-            targets[i] = memory[randomIndex].actions
+            binputs[i] = memory[randomIndex].states
+            btargets[i] = memory[randomIndex].actions
         end
-        if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
+        if opt.useGPU then binputs = binputs:cuda() btargets = btargets:cuda() end
 
-        return inputs, targets
+        return binputs, btargets
     end
 
     return memory

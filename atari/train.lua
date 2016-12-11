@@ -58,7 +58,7 @@ if opt.useGPU then
   trainer.criterion = trainer.criterion:cuda()
 end
 
--- Default RNN intial state set to zero:
+-- Default RNN initial state set to zero:
 for l = 1, opt.nLayers do
    RNNh0Batch[l] = torch.zeros(opt.batchSize, opt.nHidden)
    RNNh0Proto[l] = torch.zeros(1, opt.nHidden) -- prototype forward does not work on batches
