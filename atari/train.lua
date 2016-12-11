@@ -32,7 +32,7 @@ local gameEnv, gameActions, agent, opt = gameEnvSetup(opt)
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
 local nbStates = opt.gridSize * opt.gridSize
-local nSeq = 4*opt.gridSize -- RNN max sequence length in this game is grid size
+local nSeq = 4*opt.gridSize -- RNN max sequence length in this game is N * grid size
 
 -- Create the base RNN model:
 local model, prototype
@@ -128,7 +128,7 @@ for game = 1, opt.epochs do
 
         if reward >= 1 then 
             winCount = winCount + 1 
-            memory.remember( {states = seqMem:clone(), actions = seqAct:clone() })
+            memory.remember( {states = seqMem, actions = seqAct })
             -- We get a batch of training data to train the model:
             local inputs, targets = memory.getBatch(opt.batchSize, nSeq, nbActions, nbStates)
             -- Train the network which returns the error:
