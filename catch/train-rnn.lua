@@ -59,27 +59,15 @@ torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 print('Playing Catch game with RNN\n')
 
--- add logger
-local logger, parent = torch.class('logger','optim.Logger')
-function logger:__init(opt)
-   parent.__init(self)
-   self.logger = parent.new(paths.concat(opt.savedir,'ms_acc_loss.log'))
-   self.logger:setNames{'ms', 'accuracy', 'loss'}
-end
-function logger:write(time, acc, loss)
-   self.logger:add{time, acc, loss}
-end
-logger:__init(opt)
-
 local nbStates = opt.gridSize * opt.gridSize
 local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
 local nbActions = opt.nbActions
 
 -- memory for experience replay:
-local function Memory(maxMemory, discount)
+local function Memory(maxMemory, batchSize, nSeq, nbStates)
     local memory
-    local binputs = torch.zeros(opt.batchSize, nSeq, nbStates)
-    local btargets = torch.zeros(opt.batchSize, nSeq, nbActions)
+    local binputs = torch.zeros(batchSize, nSeq, nbStates)
+    local btargets = torch.zeros(batchSize, nSeq, nbActions)
 
     if opt.playFile ~= '' then
         memory = torch.load(opt.playFile)
@@ -98,11 +86,11 @@ local function Memory(maxMemory, discount)
         end
     end
 
-    function memory.getBatch(batchSize, nbActions, nbStates)
+    function memory.getBatch(batchSize)
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch)
         local memoryLength = #memory
-        local chosenBatchSize = math.min(opt.batchSize, memoryLength)
+        local chosenBatchSize = math.min(batchSize, memoryLength)
 
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
@@ -225,7 +213,7 @@ print('TEST model:', a)
 
 
 local gameEnv = CatchEnvironment(opt.gridSize) -- init game engine
-local memory = Memory(maxMemory, discount)
+local memory = Memory(opt.maxMemory, opt.batchSize, nSeq, nbStates)
 local seqMem = torch.zeros(nSeq, nbStates) -- store sequence of states in successful run
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
@@ -296,7 +284,6 @@ for game = 1, opt.epochs do
         print(string.format("Game: %d, epsilon: %.2f, error: %.4f, Random Actions: %d, Accuracy: %d%%, time [ms]: %d",
                              game,  epsilon,  err/opt.progFreq, randomActions/opt.progFreq, winCount/opt.progFreq*100, sys.toc()*1000))
         local acc = winCount / opt.progFreq
-        logger:write(accTime, acc, err)
         winCount = 0
         err = 0
         randomActions = 0
