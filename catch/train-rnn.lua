@@ -64,7 +64,7 @@ local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
 local nbActions = opt.nbActions
 
 -- memory for experience replay:
-local function Memory(maxMemory, batchSize, nSeq, nbStates)
+local function Memory(maxMemory, batchSize, nSeq, nbStates, nbActions)
     local memory
     local binputs = torch.zeros(batchSize, nSeq, nbStates)
     local btargets = torch.zeros(batchSize, nSeq, nbActions)
