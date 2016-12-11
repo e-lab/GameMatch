@@ -24,9 +24,6 @@ function o.parse(arg)
      --threads               (default 8)         number of threads used by BLAS routines
      --seed                  (default 1)         initial random seed
      -r,--learningRate       (default 2e-3)      learning rate
-     -d,--learningRateDecay  (default 1e-9)      learning rate decay
-     -w,--weightDecay        (default 0)         L2 penalty on the weights
-     -m,--momentum           (default 0.9)       momentum parameter
      --batchSize             (default 64)        batch size for training
      --maxMemory             (default 1e3)       Experience Replay buffer memory
      --epochs                (default 1e5)       number of training steps to perform

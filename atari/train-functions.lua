@@ -52,11 +52,6 @@ local trainer = {} -- trainer object
 -- Params for Stochastic Gradient Descent (our optimizer).
 trainer.sgdParams = {
     learningRate = opt.learningRate,
-    learningRateDecay = opt.learningRateDecay,
-    weightDecay = opt.weightDecay,
-    momentum = opt.momentum,
-    dampening = 0,
-    nesterov = true
 }
 
 -- Mean Squared Error for our loss function.
@@ -80,7 +75,6 @@ end
 
 -- training code:
 function trainer.trainNetwork(model, state, inputs, targets, nSeq, nbActions)
-    local loss = 0
     local x, gradParameters = model:getParameters()
     
     local function feval(x_new)
@@ -105,8 +99,7 @@ function trainer.trainNetwork(model, state, inputs, targets, nSeq, nbActions)
 
     local _, fs = optim.rmsprop(feval, x, trainer.sgdParams)
     
-    loss = loss + fs[1]
-    return loss
+    return fs[1] -- loss
 end
 
 return trainer
