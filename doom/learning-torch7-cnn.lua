@@ -2,6 +2,7 @@
 
 -- E. Culurciello, December 2016
 -- based on https://github.com/Marqt/ViZDoom/blob/master/examples/python/learning_tensorflow.py
+-- use CNN and DQN to train simple Doom scenarios
 
 local base_path="/Users/eugenioculurciello/Desktop/ViZDoom/"
 package.path = package.path .. ";"..base_path.."lua/vizdoom/?.lua"
@@ -51,11 +52,6 @@ os.execute('mkdir '..opt.saveDir)
 
 -- Other parameters
 local resolution = {30, 45} -- Y, X sizes of rescaled state / game screen
-
-local model_savefile = "results/model.net"
-local save_model = true
-local load_model = false
-local skip_learning = false
 local colors = sys.COLORS
 
 -- Configuration file path
@@ -63,6 +59,7 @@ local config_file_path = base_path.."scenarios/simpler_basic.cfg"
 -- local config_file_path = base_path.."scenarios/rocket_basic.cfg"
 -- local config_file_path = base_path.."scenarios/basic.cfg"
 
+-- Doom basic scenario actions:
 local actions = {
     [1] = torch.Tensor({1,0,0}),
     [2] = torch.Tensor({0,1,0}),
