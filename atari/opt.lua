@@ -23,7 +23,7 @@ function o.parse(arg)
      Training parameters:
      --threads               (default 8)         number of threads used by BLAS routines
      --seed                  (default 1)         initial random seed
-     -r,--learningRate       (default 0.1)       learning rate
+     -r,--learningRate       (default 2e-3)      learning rate
      -d,--learningRateDecay  (default 1e-9)      learning rate decay
      -w,--weightDecay        (default 0)         L2 penalty on the weights
      -m,--momentum           (default 0.9)       momentum parameter

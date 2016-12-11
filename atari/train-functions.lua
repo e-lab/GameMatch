@@ -104,7 +104,7 @@ function trainer.trainNetwork(model, state, inputs, targets, nSeq, nbActions)
         return loss, gradParameters
     end
 
-    local _, fs = optim.sgd(feval, x, trainer.sgdParams)
+    local _, fs = optim.rmsprop(feval, x, trainer.sgdParams)
     
     loss = loss + fs[1]
     return loss
