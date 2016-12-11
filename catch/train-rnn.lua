@@ -27,7 +27,7 @@ opt = lapp [[
   Training parameters:
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
-  -r,--learningRate       (default 0.1)       learning rate
+  -r,--learningRate       (default 2e-3)      learning rate
   -d,--learningRateDecay  (default 1e-9)      learning rate decay
   -w,--weightDecay        (default 0)         L2 penalty on the weights
   -m,--momentum           (default 0.9)       momentum parameter
@@ -78,6 +78,8 @@ local nbActions = opt.nbActions
 -- memory for experience replay:
 local function Memory(maxMemory, discount)
     local memory
+    local binputs = torch.zeros(opt.batchSize, nSeq, nbStates)
+    local btargets = torch.zeros(opt.batchSize, nSeq, nbActions)
 
     if opt.playFile ~= '' then
         memory = torch.load(opt.playFile)
@@ -100,20 +102,17 @@ local function Memory(maxMemory, discount)
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch)
         local memoryLength = #memory
-        local chosenBatchSize = math.min(batchSize, memoryLength)
-
-        local inputs = torch.zeros(batchSize, nSeq, nbStates)
-        local targets = torch.zeros(batchSize, nSeq, nbActions)
+        local chosenBatchSize = math.min(opt.batchSize, memoryLength)
 
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
             local randomIndex = torch.random(1, memoryLength)
-            inputs[i] = memory[randomIndex].states
-            targets[i]= memory[randomIndex].actions
+            binputs[i] = memory[randomIndex].states
+            btargets[i]= memory[randomIndex].actions
         end
-        if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
+        if opt.useGPU then binputs = binputs:cuda() btargets = btargets:cuda() end
 
-        return inputs, targets
+        return binputs, btargets
     end
 
     return memory
@@ -153,7 +152,7 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
         return loss, gradParameters
     end
 
-    local _, fs = optim.sgd(feval, x, sgdParams)
+    local _, fs = optim.rmsprop(feval, x, sgdParams)
 
     loss = loss + fs[1]
     return loss
