@@ -108,8 +108,8 @@ local function Memory(maxMemory, discount)
         -- create inputs and targets:
         for i = 1, chosenBatchSize do
             local randomIndex = torch.random(1, memoryLength)
-            inputs[i] = memory[randomIndex].states:float() -- save as byte, use as float
-            targets[i]= memory[randomIndex].actions:float()
+            inputs[i] = memory[randomIndex].states
+            targets[i]= memory[randomIndex].actions
         end
         if opt.useGPU then inputs = inputs:cuda() targets = targets:cuda() end
 
@@ -276,10 +276,7 @@ for game = 1, opt.epochs do
 
         if reward >= 1 then
             winCount = winCount + 1
-            memory.remember({
-                states = seqMem:byte(), -- save as byte, use as float
-                actions = seqAct:byte()
-            })
+            memory.remember({ states = seqMem, actions = seqAct })
             -- We get a batch of training data to train the model.
             local inputs, targets = memory.getBatch(opt.batchSize, nbActions, nbStates)
             -- Train the network which returns the error.
