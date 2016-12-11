@@ -81,7 +81,7 @@ local a = model:forward(ttest)
 
 
 -- setup memory and training variables:
-local memory = Memory(opt.maxMemory, opt.discount)
+local memory = Memory(opt.maxMemory, opt.batchSize, nSeq, nbStates, nbActions)
 local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
 local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it

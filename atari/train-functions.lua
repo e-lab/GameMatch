@@ -3,7 +3,7 @@
 -- Deep RNN for reinforcement online learning
 
 -- memory for experience replay:
-function Memory(maxMemory, discount)
+function Memory(maxMemory, batchSize, nSeq, nbStates, nbActions)
     local memory
     local binputs = torch.zeros(batchSize, nSeq, nbStates)
     local btargets = torch.zeros(batchSize, nSeq, nbActions)
@@ -26,7 +26,7 @@ function Memory(maxMemory, discount)
         end
     end
 
-    function memory.getBatch(batchSize, nSeq, nbActions, nbStates)
+    function memory.getBatch(batchSize)
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch)
         local memoryLength = #memory
