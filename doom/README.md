@@ -1,4 +1,24 @@
-# doom
+# Doom reinforcement learning
+
+Experiments and code by E. Culurciello, Fall 2016
+
+
+# Code instructions:
+
+## DQN with CNN on Doom:
+
+`th learning-torch7-cnn.lua` to train a neural network from scratch, and test it
+
+`th learning-torch7-cnn.lua --skipLearning` to only test a pre-trained neural network
+
+## RNN on Doom:
+
+
+
+
+# Installation:
+
+## Linux / Ubuntu:
 
 Linux installation issues:
 
@@ -10,7 +30,7 @@ solved the problem and runs
 
 
 
-## OS X installation notes:
+## Apple OS X:
 
 `brew install python3`, also use pip for python3 as here:
 
@@ -51,7 +71,7 @@ https://github.com/Marqt/ViZDoom/issues/144
 etc.
 
 
-# Torch7 lua bindings OS X
+## Torch7 lua bindings OS X
 
 If you want to build against luajit installed locally by torch (as in http://torch.ch/docs/getting-started.html#_), please do:
 ```
@@ -68,4 +88,8 @@ to:
 and
 
 /Users/eugenioculurciello/torch/install/share/lua/5.1 
+
+
+
+
 
