@@ -132,7 +132,7 @@ local sgdParams = {
 }
 
 local model, criterion
-function createNetwork(available_actions_count)
+local function createNetwork(nAvailableActions)
     -- create CNN model:
     model = nn.Sequential()
     model:add(nn.SpatialConvolution(1,8,6,6,3,3))
@@ -142,42 +142,40 @@ function createNetwork(available_actions_count)
     model:add(nn.View(8*4*6))
     model:add(nn.Linear(8*4*6, 128))
     model:add(nn.ReLU())
-    model:add(nn.Linear(128, available_actions_count))
+    model:add(nn.Linear(128, nAvailableActions))
 
     criterion = nn.MSECriterion()
-
-    local function functionLearn(s1, target_q)
-
-        local params, gradParams = model:getParameters()
-        
-        local function feval(x_new)
-            gradParams:zero()
-            local predictions = model:forward(s1)
-            local loss = criterion:forward(predictions, target_q)
-            local gradOutput = criterion:backward(predictions, target_q)
-            model:backward(s1, gradOutput)
-            return loss, gradParams
-        end
-
-        local _, fs = optim.rmsprop(feval, params, sgdParams)
-        return fs[1] -- loss
-    end
-
-    local function functionGetQValues(state)
-        return model:forward(state)
-    end
-
-    local function functionGetBestAction(state)
-        local q = functionGetQValues(state:float():reshape(1, 1, resolution[1], resolution[2]))
-        local max, index = torch.max(q, 1)
-        local action = index[1]
-        return action, q
-    end
-
-    return functionLearn, functionGetQValues, functionGetBestAction
 end
 
-function learnFromMemory()
+local function learnBatch(s1, target_q)
+
+    local params, gradParams = model:getParameters()
+    
+    local function feval(x_new)
+        gradParams:zero()
+        local predictions = model:forward(s1)
+        local loss = criterion:forward(predictions, target_q)
+        local gradOutput = criterion:backward(predictions, target_q)
+        model:backward(s1, gradOutput)
+        return loss, gradParams
+    end
+
+    local _, fs = optim.rmsprop(feval, params, sgdParams)
+    return fs[1] -- loss
+end
+
+local function getQValues(state)
+    return model:forward(state)
+end
+
+local function getBestAction(state)
+    local q = getQValues(state:float():reshape(1, 1, resolution[1], resolution[2]))
+    local max, index = torch.max(q, 1)
+    local action = index[1]
+    return action, q
+end
+
+local function learnFromMemory()
     -- Learns from a single transition (making use of replay memory)
     -- s2 is ignored if s2_isterminal
 
@@ -197,11 +195,11 @@ function learnFromMemory()
                 target_q[i][a[i]] = r[i] + opt.discount * (1 - isterminal[i]) * q2[i] 
             end
         end
-        learn(s1, target_q)
+        learnBatch(s1, target_q)
     end
 end
 
-function performLearningStep(epoch)
+local function performLearningStep(epoch)
     -- Makes an action according to eps-greedy policy, observes the result
     -- (next state, reward) and learns from the transition
 
@@ -248,7 +246,7 @@ function performLearningStep(epoch)
 end
 
 -- Creates and initializes ViZDoom environment:
-function initializeViZdoom(config_file_path)
+local function initializeViZdoom(config_file_path)
     print("Initializing doom...")
     game = vizdoom.DoomGame()
     game:setViZDoomPath(base_path.."bin/vizdoom")
@@ -263,7 +261,7 @@ function initializeViZdoom(config_file_path)
     return game
 end
 
-function main()
+local function main()
     -- Create Doom instance:
     local game = initializeViZdoom(config_file_path)
 
@@ -273,7 +271,7 @@ function main()
     -- Create replay memory which will store the play data:
     ReplayMemory(opt.maxMemory)
 
-    learn, getQValues, getBestAction = createNetwork(#actions) -- note: global functions!
+    createNetwork(#actions)
     
     print("Starting the training!")
 
@@ -326,7 +324,7 @@ function main()
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
 
-            print("Saving the network weigths to:", model_savefile)
+            print("Saving the network weigths to:", opt.saveDir)
             torch.save(opt.saveDir..'/model-cnn-dqn-'..epoch..'.net', model:float():clearState())
             
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
