@@ -64,46 +64,50 @@ local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
 local nbActions = opt.nbActions
 
 -- memory for experience replay:
-local function Memory(maxMemory, batchSize, nSeq, nbStates)
-    local memory
-    local binputs = torch.zeros(batchSize, nSeq, nbStates)
-    local btargets = torch.ones(batchSize, nSeq)
+local memory = {}
+local function initMemory(maxMemory)
+    memory.states = torch.zeros(maxMemory, nSeq, nbStates)
+    memory.actions = torch.ones(maxMemory, nSeq)
+    memory.capacity = maxMemory
+    memory.size = 0
+    memory.pos = 1
+   
+    -- batch buffers:
+    local binputs = torch.zeros(opt.batchSize, nSeq, nbStates)
+    local btargets = torch.ones(opt.batchSize, nSeq)
 
     if opt.playFile ~= '' then
         memory = torch.load(opt.playFile)
         print('Loaded experience replay memory with play file:', opt.playFile)
     else
-        memory = {}
         print('Initialized empty experience replay memory')
     end
 
     -- Appends the experience to the memory.
-    function memory.remember(memoryInput)
-        table.insert(memory, memoryInput)
-        if (#memory > opt.maxMemory) then
-            -- Remove the earliest memory to allocate new experience to memory.
-            table.remove(memory, 1)
-        end
+    function memory.remember(seqs,acts)
+      memory.states[memory.pos] = seqs:clone()
+      memory.actions[memory.pos] = acts:clone()
+       
+      memory.pos = (memory.pos + 1) % memory.capacity
+      if memory.pos == 0 then memory.pos = 1 end -- to prevent issues!
+      memory.size = math.min(memory.size + 1, memory.capacity)
     end
 
     function memory.getBatch(batchSize)
         -- We check to see if we have enough memory inputs to make an entire batch, if not we create the biggest
         -- batch we can (at the beginning of training we will not have enough experience to fill a batch)
-        local memoryLength = #memory
-        local chosenBatchSize = math.min(batchSize, memoryLength)
+        local chosenBatchSize = math.min(opt.batchSize, memory.size)
 
         -- create inputs and targets:
+        local ri = torch.randperm(memory.size)
         for i = 1, chosenBatchSize do
-            local randomIndex = torch.random(1, memoryLength)
-            binputs[i] = memory[randomIndex].states
-            btargets[i]= memory[randomIndex].actions
+            binputs[i] = memory.states[ri[i]]
+            btargets[i]= memory.actions[ri[i]]
         end
         if opt.useGPU then binputs = binputs:cuda() btargets = btargets:cuda() end
 
         return binputs, btargets
     end
-
-    return memory
 end
 
 -- training code:
@@ -205,7 +209,7 @@ print('TEST model:', a)
 
 
 local gameEnv = CatchEnvironment(opt.gridSize) -- init game engine
-local memory = Memory(opt.maxMemory, opt.batchSize, nSeq, nbStates)
+initMemory(opt.maxMemory) -- init memory
 local seqMem = torch.zeros(nSeq, nbStates) -- store sequence of states in successful run
 local seqAct = torch.ones(nSeq) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
@@ -249,13 +253,13 @@ for game = 1, opt.epochs do
         -- store to memory
         if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
         seqMem[steps] = currentState:clone() -- store state sequence into memory
-        seqAct[steps] = action --[action] = 1
+        seqAct[steps] = action
 
         local nextState, reward, gameOver = gameEnv.act(action)
 
         if reward >= 1 then
             winCount = winCount + 1
-            memory.remember({ states = seqMem, actions = seqAct })
+            memory.remember(seqMem, seqAct)
             -- We get a batch of training data to train the model.
             local inputs, targets = memory.getBatch(opt.batchSize, nbActions, nbStates)
             -- Train the network which returns the error.
