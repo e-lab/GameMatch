@@ -68,44 +68,6 @@ function trainer.preProcess(inImage)
   return outImage
 end
 
--- Converts input tensor into table of dimension equal to first dimension of input tensor
--- and adds padding of zeros, which in this case are states
-function trainer.tensor2Table(inputTensor, padding, state)
-   local outputTable = {}
-   for t = 1, inputTensor:size(1) do outputTable[t] = inputTensor[t] end
-   for l = 1, padding do outputTable[l + inputTensor:size(1)] = state[l]:clone() end
-   return outputTable
-end
-
--- training code:
--- function trainer.trainNetwork(model, state, inputs, targets, nSeq, nbActions)
---     local x, gradParameters = model:getParameters()
-    
---     local function feval(x_new)
---         gradParameters:zero()
---         inputs = {inputs, table.unpack(state)} -- attach states
---         local out = model:forward(inputs)
---         local predictions = torch.Tensor(nSeq, opt.batchSize, nbActions)
---         if opt.useGPU then predictions = predictions:cuda() end
---         -- create table of outputs:
---         for i = 1, nSeq do
---             predictions[i] = out[i]
---         end
---         predictions = predictions:transpose(2,1)
---         -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
---         local loss = trainer.criterion:forward(predictions, targets)
---         local grOut = trainer.criterion:backward(predictions, targets)
---         grOut = grOut:transpose(2,1)
---         local gradOutput = trainer.tensor2Table(grOut, 1, state)
---         model:backward(inputs, gradOutput)
---         return loss, gradParameters
---     end
-
---     local _, fs = optim.rmsprop(feval, x, trainer.sgdParams)
-    
---     return fs[1] -- loss
--- end
-
 
 -- training code:
 function trainer.trainNetwork(model, state, inputs, targets, nSeq)
