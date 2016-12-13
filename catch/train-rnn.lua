@@ -28,9 +28,6 @@ opt = lapp [[
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
   -r,--learningRate       (default 2e-3)      learning rate
-  -d,--learningRateDecay  (default 1e-9)      learning rate decay
-  -w,--weightDecay        (default 0)         L2 penalty on the weights
-  -m,--momentum           (default 0.9)       momentum parameter
   --batchSize             (default 64)        batch size for training
   --maxMemory             (default 1e3)       Experience Replay buffer memory
   --epochs                (default 1e4)       number of training steps to perform
@@ -110,8 +107,46 @@ local function initMemory(maxMemory)
     end
 end
 
+
+-- Create the base RNN model:
+local model, prototype
+local RNNh0Batch = {} -- initial state
+local RNNh0Proto = {} -- initial state - prototype
+local RNNhProto = {} -- state to loop through prototype in inference
+
+if opt.fw then
+  print('Created fast-weights RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden,
+    '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence length:', nSeq,
+    '\n- fast weights states:', opt.nFW)
+  model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq, opt.nFW)
+else
+  print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden,
+      '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence lenght:',  nSeq)
+  model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
+end
+
+-- Default RNN intial state set to zero:
+for l = 1, opt.nLayers do
+   RNNh0Batch[l] = torch.zeros(opt.batchSize, opt.nHidden)
+   RNNh0Proto[l] = torch.zeros(1, opt.nHidden) -- prototype forward does not work on batches
+   if opt.useGPU then RNNh0Batch[l]=RNNh0Batch[l]:cuda() RNNh0Proto[l]=RNNh0Proto[l]:cuda() end
+end
+
+-- Mean Squared Error for our loss function.
+local criterion = nn.ClassNLLCriterion()
+
+-- Params for Stochastic Gradient Descent (our optimizer).
+local sgdParams = {
+    learningRate = opt.learningRate,
+    learningRateDecay = opt.learningRateDecay,
+    weightDecay = opt.weightDecay,
+    momentum = opt.momentum,
+    dampening = 0,
+    nesterov = true
+}
+
 -- training code:
-local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
+local function trainNetwork(inputs, targets, state)
     local loss = 0
     local x, gradParameters = model:getParameters()
 
@@ -142,26 +177,6 @@ local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     return loss
 end
 
--- Create the base RNN model:
-local model, prototype
-local RNNh0Batch = {} -- initial state
-local RNNh0Proto = {} -- initial state - prototype
-local RNNhProto = {} -- state to loop through prototype in inference
-
-if opt.fw then
-  print('Created fast-weights RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden,
-    '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence length:', nSeq,
-    '\n- fast weights states:', opt.nFW)
-  model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq, opt.nFW)
-else
-  print('Created RNN with:\n- input size:', nbStates, '\n- number hidden:', opt.nHidden,
-      '\n- layers:', opt.nLayers, '\n- output size:', nbActions, '\n- sequence lenght:',  nSeq)
-  model, prototype = rnn.getModel(nbStates, opt.nHidden, opt.nLayers, nbActions, nSeq)
-end
-
--- Mean Squared Error for our loss function.
-local criterion = nn.ClassNLLCriterion()--nn.MSECriterion()
-
 -- use GPU, if desired:
 if opt.useGPU then
   require 'cunn'
@@ -174,23 +189,6 @@ if opt.useGPU then
   criterion = criterion:cuda()
   print('Using GPU number', opt.gpuId)
 end
-
--- Default RNN intial state set to zero:
-for l = 1, opt.nLayers do
-   RNNh0Batch[l] = torch.zeros(opt.batchSize, opt.nHidden)
-   RNNh0Proto[l] = torch.zeros(1, opt.nHidden) -- prototype forward does not work on batches
-   if opt.useGPU then RNNh0Batch[l]=RNNh0Batch[l]:cuda() RNNh0Proto[l]=RNNh0Proto[l]:cuda() end
-end
-
--- Params for Stochastic Gradient Descent (our optimizer).
-local sgdParams = {
-    learningRate = opt.learningRate,
-    learningRateDecay = opt.learningRateDecay,
-    weightDecay = opt.weightDecay,
-    momentum = opt.momentum,
-    dampening = 0,
-    nesterov = true
-}
 
 
 -- test model:
@@ -263,7 +261,7 @@ for game = 1, opt.epochs do
             -- We get a batch of training data to train the model.
             local inputs, targets = memory.getBatch(opt.batchSize, nbActions, nbStates)
             -- Train the network which returns the error.
-            err = err + trainNetwork(model, RNNh0Batch, inputs, targets, criterion, sgdParams)
+            err = err + trainNetwork(inputs, targets, RNNh0Batch)
         end
         -- Update the current state and if the game is over.
         currentState = nextState
