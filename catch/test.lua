@@ -7,7 +7,6 @@
 
 -- example to run with RNN: qlua test.lua results/catch-model-rnn.net 10 rnn
 
-
 require 'CatchEnvironment'
 require 'nn'
 require 'image'
@@ -15,10 +14,10 @@ require 'image'
 torch.setnumthreads(8)
 torch.setdefaulttensortype('torch.FloatTensor')
 
-local opt = {...}
-opt.fpath = opt[1]
-opt.gridSize = tonumber(opt[2]) 
-opt.rnn = opt[3]
+local opt = {}
+opt.fpath = arg[1]
+opt.gridSize = tonumber(arg[2]) 
+opt.rnn = arg[3]
 if not opt.fpath then print('missing arg #1: missing network file to test!') return end
 if not opt.gridSize then print('missing arg #2: game grid size!') return end
 
