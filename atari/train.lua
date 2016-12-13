@@ -124,7 +124,6 @@ for game = 1, opt.epochs do
         seqAct[steps][action] = 1
      
         screen, reward, isGameOver = gameEnv:step(gameActions[action], true)
-        local nextState = trainer.preProcess(screen)
 
         if reward >= 1 then 
             winCount = winCount + 1 
@@ -134,8 +133,6 @@ for game = 1, opt.epochs do
             -- Train the network which returns the error:
             err = err + trainer.trainNetwork(model, RNNh0Batch, inputs, targets, nSeq, nbActions)
         end
-        -- Update the current state and if the game is over:
-        currentState = nextState
 
         if opt.display then 
             win = image.display({image=currentState:view(opt.gridSize,opt.gridSize), zoom=10, win=win})
