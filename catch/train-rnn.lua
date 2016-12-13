@@ -64,10 +64,10 @@ local nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
 local nbActions = opt.nbActions
 
 -- memory for experience replay:
-local function Memory(maxMemory, batchSize, nSeq, nbStates, nbActions)
+local function Memory(maxMemory, batchSize, nSeq, nbStates)
     local memory
     local binputs = torch.zeros(batchSize, nSeq, nbStates)
-    local btargets = torch.zeros(batchSize, nSeq, nbActions)
+    local btargets = torch.ones(batchSize, nSeq)
 
     if opt.playFile ~= '' then
         memory = torch.load(opt.playFile)
@@ -106,39 +106,31 @@ local function Memory(maxMemory, batchSize, nSeq, nbStates, nbActions)
     return memory
 end
 
--- Converts input tensor into table of dimension equal to first dimension of input tensor
--- and adds padding of zeros, which in this case are states
-local function tensor2Table(inputTensor, padding, state)
-   local outputTable = {}
-   for t = 1, inputTensor:size(1) do outputTable[t] = inputTensor[t] end
-   for l = 1, padding do outputTable[l + inputTensor:size(1)] = state[l]:clone() end
-   return outputTable
-end
-
 -- training code:
 local function trainNetwork(model, state, inputs, targets, criterion, sgdParams)
     local loss = 0
     local x, gradParameters = model:getParameters()
 
     local function feval(x_new)
-        gradParameters:zero()
-        inputs = {inputs, table.unpack(state)} -- attach states
-        local out = model:forward(inputs)
-        local predictions = torch.Tensor(nSeq, opt.batchSize, nbActions)
-        if opt.useGPU then predictions = predictions:cuda() end
-        -- create table of outputs:
-        for i = 1, nSeq do
-            predictions[i] = out[i]
-        end
-        predictions = predictions:transpose(2,1)
-        -- print('in', inputs) print('outs:', out) print('targets', {targets}) print('predictions', {predictions})
-        local loss = criterion:forward(predictions, targets)
-        local grOut = criterion:backward(predictions, targets)
-        grOut = grOut:transpose(2,1)
-        local gradOutput = tensor2Table(grOut, 1, state)
-        model:backward(inputs, gradOutput)
-        return loss, gradParameters
-    end
+      local loss = 0
+      local grOut = {}
+      -- print(state)
+      -- print(targets)
+      -- print(inputs)
+      -- io.read()
+      local inputs = { inputs, table.unpack(state) } -- attach RNN states to input
+      local out = model:forward(inputs)
+      -- process each sequence step at a time:
+      for i = 1, nSeq do
+          gradParameters:zero()
+          loss = loss + criterion:forward(out[i], targets[{{},i}])
+          grOut[i] = criterion:backward(out[i], targets[{{},i}])
+      end
+      table.insert(grOut, state) -- attach RNN states to grad output
+      model:backward(inputs, grOut)
+      -- print(loss)
+      return loss, gradParameters
+  end
 
     local _, fs = optim.rmsprop(feval, x, sgdParams)
 
@@ -164,7 +156,7 @@ else
 end
 
 -- Mean Squared Error for our loss function.
-local criterion = nn.MSECriterion()
+local criterion = nn.ClassNLLCriterion()--nn.MSECriterion()
 
 -- use GPU, if desired:
 if opt.useGPU then
@@ -215,7 +207,7 @@ print('TEST model:', a)
 local gameEnv = CatchEnvironment(opt.gridSize) -- init game engine
 local memory = Memory(opt.maxMemory, opt.batchSize, nSeq, nbStates)
 local seqMem = torch.zeros(nSeq, nbStates) -- store sequence of states in successful run
-local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
+local seqAct = torch.ones(nSeq) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
@@ -256,8 +248,8 @@ for game = 1, opt.epochs do
         end
         -- store to memory
         if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
-        seqMem[steps] = currentState -- store state sequence into memory
-        seqAct[steps][action] = 1
+        seqMem[steps] = currentState:clone() -- store state sequence into memory
+        seqAct[steps] = action --[action] = 1
 
         local nextState, reward, gameOver = gameEnv.act(action)
 
@@ -277,7 +269,7 @@ for game = 1, opt.epochs do
             win = image.display({image=currentState:view(opt.gridSize,opt.gridSize), zoom=10, win=win})
         end
     end
-    seqAct:zero()
+    seqAct:fill(1)
     steps = 0 -- resetting step count (which is always grdiSize-2 anyway...)
 
     if game%opt.progFreq == 0 then
