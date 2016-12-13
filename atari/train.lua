@@ -81,9 +81,9 @@ local a = model:forward(ttest)
 
 
 -- setup memory and training variables:
-local memory = Memory(opt.maxMemory, opt.batchSize, nSeq, nbStates, nbActions)
+local memory = initMemory(opt.maxMemory, nSeq, nbStates)
 local seqMem = torch.Tensor(nSeq, nbStates) -- store sequence of states in successful run
-local seqAct = torch.zeros(nSeq, nbActions) -- store sequence of actions in successful run
+local seqAct = torch.zeros(nSeq) -- store sequence of actions in successful run
 local epsilon = opt.epsilon -- this will change in the training, so we copy it
 local epsUpdate = (epsilon - opt.epsilonMinimumValue)/opt.epochs
 local winCount = 0
@@ -121,17 +121,17 @@ for game = 1, opt.epochs do
         -- store to memory (but be careful to avoid larger than max seq: nSeq)
         if opt.useGPU then currentState = currentState:float() end -- store in system memory, not GPU memory!
         seqMem[steps] = currentState -- store state sequence into memory
-        seqAct[steps][action] = 1
+        seqAct[steps] = action
      
         screen, reward, isGameOver = gameEnv:step(gameActions[action], true)
 
         if reward >= 1 then 
             winCount = winCount + 1 
-            memory.remember( {states = seqMem, actions = seqAct })
+            memory.remember(seqMem, seqAct)
             -- We get a batch of training data to train the model:
             local inputs, targets = memory.getBatch(opt.batchSize, nSeq, nbActions, nbStates)
             -- Train the network which returns the error:
-            err = err + trainer.trainNetwork(model, RNNh0Batch, inputs, targets, nSeq, nbActions)
+            err = err + trainer.trainNetwork(model, RNNh0Batch, inputs, targets, nSeq)
         end
 
         if opt.display then 
@@ -139,7 +139,7 @@ for game = 1, opt.epochs do
             win2 = image.display({image=screen, zoom=1, win=win2})
         end
     end
-    seqAct:zero()
+    seqAct:fill(1)
     steps = 0 -- resetting step count (which is always grdiSize-2 anyway...)
 
     if game%opt.progFreq == 0 then 
