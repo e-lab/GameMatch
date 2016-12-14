@@ -140,8 +140,6 @@ local function createNetwork(nAvailableActions)
     model = nn.Sequential()
     model:add(nn.SpatialConvolution(1,32,8,8,4,4))
     model:add(nn.SpatialConvolution(32,64,4,4,2,2))
-    -- model:add(nn.SpatialConvolution(64,64,3,3,1,1))
-    -- model:add(nn.SpatialMaxPooling(7,7))
     model:add(nn.View(64))
     model:add(nn.Linear(64, nbActions))
     -- test:
@@ -271,7 +269,7 @@ local function main()
             print(colors.red.."Training...")
             game:nextRandomGame()
             score = 0 
-            for learningStep=1, opt.learningStepsEpoch do
+            for learningStep = 1, opt.learningStepsEpoch do
                 xlua.progress(learningStep, opt.learningStepsEpoch)
                 epsilon, gameOver, reward = performLearningStep(epoch)
                 score = score + reward
@@ -296,7 +294,7 @@ local function main()
             -- print(colors.red.."\nTesting...")
             -- local testEpisode = {}
             -- local testScores = {}
-            -- for testEpisode=1, opt.testEpisodesEpoch do
+            -- for testEpisode = 1, opt.testEpisodesEpoch do
             --     xlua.progress(testEpisode, opt.testEpisodesEpoch)
             --     screen = game:nextRandomGame()
             --     score = 0

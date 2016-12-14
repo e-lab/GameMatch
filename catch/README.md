@@ -10,6 +10,8 @@ Train: `th train.lua` trains an MLP model to achieve 100% accuracy. `th train.lu
 
 Test trained network: `th train.lua --skipLearning --load results/model-catch-dqn.net` to load a pre-trained network and run test game. Run with `qlua train.lua --skipLearning --load results/model-catch-dqn.net --display` to see output display. 
 
+To run on a larger game grid (default grid size is 10 x 10) you can use: `th train.lua --gridSize 20 --epochs 20 --learningStepsEpoch 2000` for a 20 x 20 grid size.
+
 Separate test on game play: `qlua test-catch.lua catch-model-grid.net 10`, params: trained CNN/MLP model, grid size (must be same as training), rnn (optional to test RNN models, see below also)
 
 
