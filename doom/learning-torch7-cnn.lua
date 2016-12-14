@@ -84,7 +84,7 @@ local function ReplayMemory(capacity)
     local channels = 1
     memory.s1 = torch.zeros(capacity, channels, resolution[1], resolution[2])
     memory.s2 = torch.zeros(capacity, channels, resolution[1], resolution[2])
-    memory.a = torch.zeros(capacity)
+    memory.a = torch.ones(capacity)
     memory.r = torch.zeros(capacity)
     memory.isterminal = torch.zeros(capacity)
 
@@ -95,11 +95,12 @@ local function ReplayMemory(capacity)
     -- batch buffers:
     memory.bs1 = torch.zeros(opt.batchSize, channels, resolution[1], resolution[2])
     memory.bs2 = torch.zeros(opt.batchSize, channels, resolution[1], resolution[2])
-    memory.ba = torch.zeros(opt.batchSize)
+    memory.ba = torch.ones(opt.batchSize)
     memory.br = torch.zeros(opt.batchSize)
     memory.bisterminal = torch.zeros(opt.batchSize)
 
     function memory.addTransition(s1, action, s2, isterminal, reward)
+        if memory.pos == 0 then memory.pos = 1 end -- tensors do not have 0 index items!
         memory.s1[{memory.pos, 1, {}, {}}] = s1
         memory.a[memory.pos] = action
         if not isterminal then
@@ -109,13 +110,12 @@ local function ReplayMemory(capacity)
         memory.r[memory.pos] = reward
 
         memory.pos = (memory.pos + 1) % memory.capacity
-        if memory.pos == 0 then memory.pos = 1 end -- to prevent issues!
         memory.size = math.min(memory.size + 1, memory.capacity)
     end
 
     function memory.getSample(sampleSize)
         for i=1,sampleSize do
-            local ri = torch.random(1, memory.size)
+            local ri = torch.random(1, memory.size-1)
             memory.bs1[i] = memory.s1[ri]
             memory.bs2[i] = memory.s2[ri]
             memory.ba[i] = memory.a[ri]
@@ -182,18 +182,15 @@ local function learnFromMemory()
     -- Get a random minibatch from the replay memory and learns from it
     if memory.size > opt.batchSize then
         local s1, a, s2, isterminal, r = memory.getSample(opt.batchSize)
-        r = r:clamp(-1,1) -- NOTE: clamping of reward!
+        if opt.clampReward then r = r:clamp(-1,1)  end -- clamping of reward!
 
         local q2 = torch.max(getQValues(s2), 2) -- get max q for each sample of batch
         local target_q = getQValues(s1):clone()
-        local targetq0 = target_q:clone()
-
+     
         -- target differs from q only for the selected action. The following means:
         -- target_Q(s,a) = r + gamma * max Q(s2,_) if isterminal else r
         for i=1,opt.batchSize do
-            if a[i]>0  then 
-                target_q[i][a[i]] = r[i] + opt.discount * (1 - isterminal[i]) * q2[i] 
-            end
+            target_q[i][a[i]] = r[i] + opt.discount * (1 - isterminal[i]) * q2[i]
         end
         learnBatch(s1, target_q)
     end
