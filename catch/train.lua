@@ -154,7 +154,6 @@ local function learnBatch(state, targets)
     local params, gradParams = model:getParameters()
     
     local function feval(x_new)
-        -- print(state, targets) io.read()
         gradParams:zero()
         local predictions = model:forward(state)
         local loss = criterion:forward(predictions, targets)
