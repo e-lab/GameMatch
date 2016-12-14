@@ -37,7 +37,7 @@ opt = lapp [[
   --nHidden               (default 128)      hidden states in neural net
 
   Display and save parameters:
-  --zoom                  (default 4)        zoom window
+  --zoom                  (default 10)       zoom window
   --display                                  display stuff
   --saveDir          (default './results')   subdirectory to save experiments in
   --load                  (default '')       load neural network to test
@@ -326,18 +326,18 @@ local function main()
     for i = 1, opt.episodesWatch do
         game.reset()
         local score = 0
+        local win
         gameOver = false
         while not gameOver do
             local state = game.observe()
             local bestActionIndex = getBestAction(state)
             _, reward, gameOver = game.act(bestActionIndex)
             score = score + reward
-        end
-
-        -- display
-        local win
-        if opt.display then 
-            win = image.display({image=state:view(opt.gridSize,opt.gridSize), zoom=opt.zoom, win=win})
+            -- display
+            if opt.display then 
+                win = image.display({image=state:view(opt.gridSize,opt.gridSize), zoom=opt.zoom, win=win})
+            end
+            sys.sleep(0.1) -- slow down game
         end
 
         -- Sleep between episodes:
