@@ -381,7 +381,7 @@ local function main()
                     testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
 
                 print("Saving the network weigths to:", opt.saveDir)
-                torch.save(opt.saveDir..'/model-rnn-'..epoch..'.net', model:float():clearState())
+                torch.save(opt.saveDir..'/model-rnn-'..epoch..'.net', model:clone():float():clearState())
             end
 
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
