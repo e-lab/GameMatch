@@ -242,6 +242,9 @@ end
 game = CatchEnvironment(gridSize)
 print("Catch game initialized.")
 
+local logger = optim.Logger(opt.saveDir..'/model-catch-dqn.log')
+logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
+
 local function main()
     local epsilon, gameOver, score, reward
 
@@ -275,8 +278,8 @@ local function main()
 
             -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
                 -- trainScores:mean(), trainScores:std(), trainScores:min(), trainScores:max()))
-            print(string.format("Games played: %d, Accuracy: %d %%", 
-                trainEpisodesFinished, trainScores:gt(0):sum()/trainEpisodesFinished*100))
+            local logTrain = trainScores:gt(0):sum()/trainEpisodesFinished*100
+            print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
             print('Epsilon value', epsilon)
 
             print(colors.red.."\nTesting...")
@@ -299,10 +302,12 @@ local function main()
             testScores = torch.Tensor(testScores)
             -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 -- testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
+            local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
             print(string.format("Games played: %d, Accuracy: %d %%", 
-                opt.testEpisodesEpoch, testScores:gt(0):sum()/opt.testEpisodesEpoch*100))
+                opt.testEpisodesEpoch, logTest))
             
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            logger:add{ logTrain, logTest }
         end
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
@@ -310,7 +315,7 @@ local function main()
         print('Loaded model is:', model)
     end 
     print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/model-catch-dqn.net', model:float():clearState())
+            torch.save(opt.saveDir..'/model-catch-dqn.net', model:clone():float():clearState())
     -- game:close()
 
     print("======================================")

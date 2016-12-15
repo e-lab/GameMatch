@@ -251,6 +251,9 @@ local function performLearningStep(epoch)
     return eps, gameOver, reward
 end
 
+local logger = optim.Logger(opt.saveDir..'/model-atari-dqn.log')
+logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
+
 local win -- window for display
 local function main()
     local epsilon, gameOver, score, reward, screen
@@ -286,10 +289,10 @@ local function main()
 
             trainScores = torch.Tensor(trainScores)
 
-            print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
-                trainScores:mean(), trainScores:std(), trainScores:min(), trainScores:max()))
-            -- print(string.format("Games played: %d, Accuracy: %d %%", 
-                -- trainEpisodesFinished, trainScores:gt(0):sum()/trainEpisodesFinished*100))
+            -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
+                -- trainScores:mean(), trainScores:std(), trainScores:min(), trainScores:max()))
+            local logTrain = trainScores:gt(0):sum()/trainEpisodesFinished*100
+            print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
             print('Epsilon value', epsilon)
 
             -- print(colors.red.."\nTesting...")
@@ -315,10 +318,12 @@ local function main()
             -- testScores = torch.Tensor(testScores)
             -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
             --     testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
-            -- -- print(string.format("Games played: %d, Accuracy: %d %%", 
-            --     -- opt.testEpisodesEpoch, testScores:gt(0):sum()/opt.testEpisodesEpoch*100))
+            -- local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
+            -- print(string.format("Games played: %d, Accuracy: %d %%", 
+            --     opt.testEpisodesEpoch, logTest))
             
             -- print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            -- logger:add{ logTrain, logTest }
         end
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
@@ -326,7 +331,7 @@ local function main()
         print('Loaded model is:', model)
     end 
     print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/model-atari-dqn.net', model:float():clearState())
+            torch.save(opt.saveDir..'/model-atari-dqn.net', model:clone():float():clearState())
     -- game:close()
 
     print("======================================")
