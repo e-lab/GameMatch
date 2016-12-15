@@ -37,7 +37,6 @@ opt = lapp [[
   --clampReward                              clamp reward to -1, 1
 
   -- Model parameters:
-  --nSeq                  (default 10)       RNN maximum sequence length
   --fw                                       Use FastWeights or not
   --nLayers               (default 1)        RNN layers
   --nHidden               (default 128)      RNN hidden size
@@ -160,10 +159,6 @@ local function learnBatch(seqs, targets, state)
     local function feval(x_new)
         local loss = 0
         local grOut = {}
-        -- print(state)
-        -- print(targets)
-        -- print(seqs)
-        -- io.read()
         local inputs = { seqs, table.unpack(state) } -- attach RNN states to input
         local out = model:forward(inputs)
         -- process each sequence step at a time:
@@ -174,7 +169,6 @@ local function learnBatch(seqs, targets, state)
         end
         table.insert(grOut, state) -- attach RNN states to grad output
         model:backward(inputs, grOut)
-        -- print(loss)
         return loss, gradParameters
     end
 
@@ -193,9 +187,8 @@ end
 -- NOTE: RNNhProto has to be initialized, afterwards is fed back in this function:
 local function fwdProto(state)
     local inputs = {state:view(1, nbStates), RNNhProto}
-    -- print(inputs)
     local q = prototype:forward(inputs)
-    -- Find the max index (the chosen action).
+    -- Find the max index (the chosen action):
     local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is RNN state
     local action = index[1]
     RNNhProto = q[1] -- next prototype state feeds back to prototype
@@ -260,7 +253,6 @@ local function performLearningStep(epoch)
     
     -- if it is a successful sequence, record it and the learn
     if reward > 0 then 
-        -- print(sSeq, aSeq, a) io.read()
         -- Remember the transition that was just experienced:
         memory.addTransition(sSeq, aSeq)
         -- reset step counter and sequence buffers:
@@ -273,7 +265,6 @@ local function performLearningStep(epoch)
             resetSeqs()
         end
     end
-    -- print(a, steps)
 
     return eps, gameOver, reward
 end
@@ -282,6 +273,9 @@ end
 -- Create Catch game instance:
 game = CatchEnvironment(gridSize)
 print("Catch game initialized.")
+
+local logger = optim.Logger(opt.saveDir..'/model-catch-dqn.log')
+logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
 
 local function main()
     local epsilon, gameOver, score, reward
@@ -312,14 +306,14 @@ local function main()
                 end
             end
 
-            print(string.format("%d training episodes played.", trainEpisodesFinished))
+            -- print(string.format("%d training episodes played.", trainEpisodesFinished))
 
             trainScores = torch.Tensor(trainScores)
 
             -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
                 -- trainScores:mean(), trainScores:std(), trainScores:min(), trainScores:max()))
-            print(string.format("Games played: %d, Accuracy: %d %%", 
-                trainEpisodesFinished, trainScores:gt(0):sum()/trainEpisodesFinished*100))
+            local logTrain = trainScores:gt(0):sum()/trainEpisodesFinished*100
+            print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
             print('Epsilon value', epsilon)
 
             print(colors.red.."\nTesting...")
@@ -343,10 +337,12 @@ local function main()
             testScores = torch.Tensor(testScores)
             -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 -- testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
+            local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
             print(string.format("Games played: %d, Accuracy: %d %%", 
-                opt.testEpisodesEpoch, testScores:gt(0):sum()/opt.testEpisodesEpoch*100))
+                opt.testEpisodesEpoch, logTest))
             
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            logger:add{ logTrain, logTest }
         end
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
