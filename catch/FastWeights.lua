@@ -6,8 +6,6 @@
 -- Usage: computes the A(t) * h_s(t+1) loop
 -- after you need to perform layer normalization (LN) and obtain:
 --       h_s+1(t + 1) = f(LN[W*h(t) + C*x(t) + A(t)*h_s(t + 1)])
--- after also call: FastWeights:updatePrevOuts( h_s+1(t + 1) )
---
 
 local FastWeights, parent = torch.class('nn.FastWeights', 'nn.Identity') -- Identity parent class 
 
@@ -27,10 +25,14 @@ function FastWeights:updateOutput(input)
    local hSum = torch.zeros(self.nFeat)
    -- fast weights update:
    for f = 1, self.nFW do -- 1 = most recent, nFW = most past
-      local prod = self.prevOuts[f]:view(1,-1) * input
-      hSum = hSum + self.prevOuts[f]:clone():mul(prod[1]):mul(self.lambda^(f))
+      -- print(self.prevOuts, self.prevOuts[1], input)
+      local prod = input:clone():cmul(self.prevOuts[f]):sum()
+      -- print({self.prevOuts[f], input, prod}) --io.read()
+      -- local prod = self.prevOuts[f]:view(1,-1) * input
+      hSum = hSum + self.prevOuts[f]:clone():mul(prod):mul(self.lambda^(f))
    end
-   local nextH = self.eta * hSum
+   local nextH = hSum:mul(self.eta):view(1,-1)
+   -- print(nextH)
 
    -- store new state in buffer:
    table.insert(self.prevOuts, 1, nextH) -- add new states to 1st place
