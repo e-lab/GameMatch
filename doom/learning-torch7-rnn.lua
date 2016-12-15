@@ -104,16 +104,16 @@ local function ReplayMemory(capacity)
     memory.ba = torch.zeros(opt.batchSize, opt.nSeq)
     
     function memory.addTransition(state, action)
+        if memory.pos == 0 then memory.pos = 1 end -- tensors do not have 0 index items!
         memory.s[memory.pos] = state:clone()
         memory.a[memory.pos] = action--:clone()
        
         memory.pos = (memory.pos + 1) % memory.capacity
-        if memory.pos == 0 then memory.pos = 1 end -- to prevent issues!
         memory.size = math.min(memory.size + 1, memory.capacity)
     end
 
     function memory.getSample(sampleSize)
-        local ri = torch.randperm(memory.size)
+        local ri = torch.randperm(memory.size-1)
         for i=1, math.min(sampleSize,memory.size) do
             memory.bs[i] = memory.s[ri[i]]
             memory.ba[i] = memory.a[ri[i]]
@@ -181,7 +181,7 @@ local function learnBatch(seqs, targets, state)
         local loss = 0
         local grOut = {}
         -- print(state)
-        print(targets)
+        -- print(targets)
         -- print(seqs)
         -- io.read()
         local inputs = { seqs, table.unpack(state) } -- attach RNN states to input
