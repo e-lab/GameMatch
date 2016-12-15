@@ -28,15 +28,15 @@ opt = lapp [[
   --randomStarts        (default 30)                play action 0 between 1 and random_starts number of times at the start of each training episode
 
   Training parameters:
-  --skipLearning                             skip learning and just test
+  --skipLearning                              skip learning and just test
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
   -r,--learningRate       (default 0.00025)   learning rate
   --batchSize             (default 64)        batch size for training
-  --maxMemory             (default 1e3)       Experience Replay buffer memory
-  --epochs                (default 20)        number of training steps to perform
-  --learningStepsEpoch    (default 2000)      Learning steps per epoch
-  --testEpisodesEpoch     (default 10)        test episodes per epoch
+  --maxMemory             (default 1e4)       Experience Replay buffer memory
+  --epochs                (default 100)       number of training steps to perform
+  --learningStepsEpoch    (default 5000)      Learning steps per epoch
+  --testEpisodesEpoch     (default 100)       test episodes per epoch
   --episodesWatch         (default 10)        episodes to watch after training
   --clampReward                               clamp reward to -1, 1
   --useGPU                                    use GPU in training
@@ -46,7 +46,7 @@ opt = lapp [[
   --zoom                  (default 4)         zoom window
   --display                                   display stuff
   --saveDir          (default './results')    subdirectory to save experiments in
-  --load                  (default '')       load neural network to test
+  --load                  (default '')        load neural network to test
 ]]
    
 -- format options:
@@ -73,8 +73,9 @@ local nbStates = gridSize * gridSize
 -- Converts and down-samples the input image:
 local poolnet = nn.SpatialMaxPooling(4,4,4,4)
 local function screenPreProcess(inImage)
+  -- this is the general case: whole screen:
   -- return image.scale(inImage[1], gridSize, gridSize, 'simple'):sum(1):div(3) -- we also convert to B/W from color
--- end
+  -- this is a simple version looking just at the inside grid:
   local pooled = poolnet:forward(inImage[1][{{},{94,194},{9,152}}])
   local outImage = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
   return outImage
@@ -221,7 +222,7 @@ local function performLearningStep(epoch)
         end
     end
 
-    local screen = game:step(gameActions[1]) -- just step once to start!
+    local screen = game:step(gameActions[1], true) -- just step once to start!
     local s1 = screenPreProcess(screen)
 
     -- With probability eps make a random action:
@@ -233,7 +234,7 @@ local function performLearningStep(epoch)
         -- Choose the best action according to the network:
         a = getBestAction(s1)
     end
-    screen, reward, gameOver = game:step(gameActions[a])
+    screen, reward, gameOver = game:step(gameActions[a], true)
     s2 = screenPreProcess(screen)
 
     if gameOver then s2 = nil end
@@ -302,7 +303,7 @@ local function main()
             --     while not gameOver do
             --         local state = screenPreProcess(screen)
             --         local bestActionIndex = getBestAction(state)
-            --         state, reward, gameOver = game:step(gameActions[bestActionIndex])
+            --         state, reward, gameOver = game:step(gameActions[bestActionIndex], true)
             --         score = score + reward
             --         if opt.display then 
             --           win = image.display({image=screen, zoom=opt.zoom, win=win})
@@ -337,8 +338,9 @@ local function main()
         gameOver = false
         while not gameOver do
             local state = screenPreProcess(screen)
-            local bestActionIndex = getBestAction(state)
-            state, reward, gameOver = game:step(gameActions[bestActionIndex])
+            local action = getBestAction(state)
+            -- play game in test mode (episodes don't end when losing a life)
+            state, reward, gameOver = game:step(gameActions[action], false)
             score = score + reward
             -- display
             if opt.display then 
