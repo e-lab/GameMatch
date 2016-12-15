@@ -49,7 +49,6 @@ torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.saveDir)
 print('Playing Catch game with Q-learning and mlp/cnn\n')
 
-
 local epsilon = opt.epsilon
 local nbActions = opt.nbActions
 local gridSize = opt.gridSize
@@ -58,11 +57,6 @@ local nbStates = gridSize * gridSize
 -- Other parameters:
 local colors = sys.COLORS
 
--- Converts and down-samples the input image:
-local function preprocess(inImage)
-    inImage = inImage:float():div(255)
-  return image.scale(inImage, unpack(resolution))
-end
 
 -- class ReplayMemory:
 local memory = {}
