@@ -65,7 +65,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(opt.seed)
 os.execute('mkdir '..opt.savedir)
 
-local gameEnv, gameActions, agent, opt = setup(opt) -- setup game environment
+local gameEnv, gameActions, agent, opt = gameEnvSetup(opt) -- setup game environment
 print('Game started. Number of game actions:', #gameActions)
 local nbActions = #gameActions
 local nbStates = opt.gridSize * opt.gridSize
@@ -73,13 +73,12 @@ local nSeq = 4*opt.gridSize -- RNN max sequence length in this game is grid size
 
 local qtimer = qt.QTimer()
 
-function preProcess(im)
-  local net = nn.SpatialMaxPooling(4,4,4,4)
-  -- local pooled = net:forward(im[1])
-  local pooled = net:forward(im[1][{{},{94,194},{9,152}}])
-  -- print(pooled:size())
-  local out = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
-  return out
+-- Converts and down-samples the input image:
+local poolnet = nn.SpatialMaxPooling(4,4,4,4)
+local function screenPreProcess(inImage)
+  local pooled = poolnet:forward(inImage[1][{{},{94,194},{9,152}}])
+  local outImage = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
+  return outImage
 end
 
 function autoPlay(state) -- plays automatically breakout so we do not have to
@@ -103,7 +102,7 @@ end
 
 -- start a new game
 local screen, reward, isGameOver = gameEnv:newGame()
-local currentState = preProcess(screen) -- resize to smaller size
+local currentState = screenPreProcess(screen) -- resize to smaller size
 local episodes, totalReward = 0, 0
 
 -- Create a window for displaying output frames
@@ -127,7 +126,7 @@ function main()
   -- get human player move:
   if steps > 1 and opt.autoPlay then action = autoPlay(currentState) end -- automatic play option
   screen, reward, isGameOver = gameEnv:step(gameActions[action], false)
-  currentState = preProcess(screen) -- resize to smaller size
+  currentState = screenPreProcess(screen) -- resize to smaller size
 
   -- store to memory
   seqMem[steps] = currentState:clone() -- store state sequence into memory
