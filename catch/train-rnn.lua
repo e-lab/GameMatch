@@ -350,7 +350,7 @@ local function main()
         print('Loaded model is:', model)
     end 
     print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/model-catch-dqn.net', model:float():clearState())
+            torch.save(opt.saveDir..'/model-catch-dqn.net', model:clone():float():clearState())
     -- game:close()
 
     print("======================================")
