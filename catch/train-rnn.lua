@@ -21,7 +21,7 @@ opt = lapp [[
   --discount            (default 0.99)       discount factor in learning
   --epsilon             (default 1)          initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.1)        final value of ϵ-greedy action selection
-  --nbActions           (default 3)           catch number of actions
+  --nbActions           (default 3)          catch number of actions
   
   Training parameters:
   --skipLearning                             skip learning and just test
@@ -44,6 +44,7 @@ opt = lapp [[
 
   Display and save parameters:
   --display                                  display stuff
+  --zoom                  (default 10)       zoom display
   --saveDir          (default './results')   subdirectory to save experiments in
   --load                  (default '')       load neural network to test
 ]]
@@ -164,7 +165,7 @@ local function learnBatch(seqs, targets, state)
     local function feval(x_new)
         local loss = 0
         local grOut = {}
-        -- state = unpack(RNNh0Batch)
+        state = unpack(RNNh0Batch) -- NOTE: we should not do this, but somehow this give better results!!!!
         local inputs = { seqs, state } -- attach RNN states to input
         local out = model:forward(inputs)
         -- process each sequence step at a time:
@@ -329,12 +330,12 @@ local function main()
                 resetProtoState() -- reset prototype RNN state after each new game
                 local r = 0
                 gameOver = false
-                while not gameOver do
+                repeat
                     local state = game.observe()
                     local bestActionIndex = fwdProto(state)
                     _, reward, gameOver = game.act(bestActionIndex)
                     r = r + reward 
-                end
+                until gameOver
                 table.insert(testScores, r)
             end
 
@@ -348,13 +349,13 @@ local function main()
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
             logger:add{ logTrain, logTest }
         end
+        print("Saving the network weigths to:", opt.saveDir)
+            torch.save(opt.saveDir..'/proto-catch-dqn.net', prototype:clone():float():clearState())
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
-        model = torch.load(opt.load) -- otherwise load network to test!
-        print('Loaded model is:', model)
+        prototype = torch.load(opt.load) -- otherwise load network to test!
+        print('Loaded model is:', prototype)
     end 
-    print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/model-catch-dqn.net', model:clone():float():clearState())
     -- game.close()
 
     print("======================================")
@@ -366,7 +367,7 @@ local function main()
         local score = 0
         local win
         gameOver = false
-        while not gameOver do
+        repeat
             local state = game.observe()
             local bestActionIndex = fwdProto(state)
             _, reward, gameOver = game.act(bestActionIndex)
@@ -376,7 +377,7 @@ local function main()
                 win = image.display({image=state:view(opt.gridSize,opt.gridSize), zoom=opt.zoom, win=win})
             end
             sys.sleep(0.1) -- slow down game
-        end
+        until gameOver
 
         -- Sleep between episodes:
         sys.sleep(1)
