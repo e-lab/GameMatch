@@ -68,11 +68,14 @@ opt.nSeq = opt.gridSize-2 -- RNN sequence length in this game is grid size
 -- Other parameters:
 local colors = sys.COLORS
 
+-- Create Catch game instance:
+local game = CatchEnvironment(gridSize)
+print("Catch game initialized.")
+
 
 -- class ReplayMemory:
 local memory = {}
 local function ReplayMemory(capacity)
-    local channels = 1
     memory.s = torch.zeros(capacity, opt.nSeq, nbStates) -- state
     memory.a = torch.zeros(capacity, opt.nSeq) -- action
     memory.rs = torch.zeros(capacity, opt.nHidden) -- RNN state
@@ -124,7 +127,7 @@ for l = 1, opt.nLayers do
 end
 RNNhProto = table.unpack(RNNh0Proto) -- initial setup of RNN prototype state
 
-local function createNetwork(nAvailableActions)
+local function createNetwork(nbActions)
     -- Create the base RNN model:
     -- here the state is not an image, but a vectorized version of the image
     -- next steps are convRNN models
@@ -268,6 +271,7 @@ local function performLearningStep(epoch)
     -- save sequences:
     sSeq[steps] = state:clone()
     aSeq[steps] = a
+
     -- if it is a successful sequence, record it and the learn
     if reward > 0 then 
         -- shift sequence so end of game is last item in list:
@@ -287,10 +291,6 @@ local function performLearningStep(epoch)
     return eps, gameOver, reward
 end
 
-
--- Create Catch game instance:
-game = CatchEnvironment(gridSize)
-print("Catch game initialized.")
 
 local logger = optim.Logger(opt.saveDir..'/model-catch-dqn.log')
 logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
