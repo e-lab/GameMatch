@@ -19,8 +19,8 @@ lapp = require 'pl.lapp'
 opt = lapp [[
 
   Game options:
-  --gridSize            (default 30)         default screen resized for neural net input
-  --discount            (default 0.9)        discount factor in learning
+  --gridSize            (default 20)         default screen resized for neural net input
+  --discount            (default 0.99)       discount factor in learning
   --epsilon             (default 1)          initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.1)        final value of ϵ-greedy action selection
   
@@ -28,9 +28,9 @@ opt = lapp [[
   --skipLearning                             skip learning and just test
   --threads               (default 8)        number of threads used by BLAS routines
   --seed                  (default 1)        initial random seed
-  -r,--learningRate       (default 2e-3)     learning rate
+  -r,--learningRate       (default 0.001)    learning rate
   --batchSize             (default 64)       batch size for training
-  --maxMemory             (default 1e3)      Experience Replay buffer memory
+  --maxMemory             (default 1e4)      Experience Replay buffer memory
   --epochs                (default 20)       number of training steps to perform
 
   -- Q-learning settings:
@@ -38,7 +38,7 @@ opt = lapp [[
   --clampReward                              clamp reward to -1, 1
 
   -- Model parameters:
-  --nSeq                  (default 10)       RNN maximum sequence length
+  --nSeq                  (default 20)       RNN maximum sequence length
   --fw                                       Use FastWeights or not
   --nLayers               (default 1)        RNN layers
   --nHidden               (default 128)      RNN hidden size
@@ -187,7 +187,8 @@ local function learnBatch(seqs, targets, state)
     local function feval(x_new)
         local loss = 0
         local grOut = {}
-        local inputs = { seqs, table.unpack(state) } -- attach RNN states to input
+        state = unpack(RNNh0Batch) -- NOTE: we should not do this, but somehow this give better results!!!!
+        local inputs = { seqs, state } -- attach RNN states to input
         local out = model:forward(inputs)
         -- process each sequence step at a time:
         for i = 1, opt.nSeq do
@@ -216,7 +217,6 @@ end
 -- NOTE: RNNhProto has to be initialized, afterwards is fed back in this function:
 local function fwdProto(state)
     local inputs = {state:view(1, nbStates), RNNhProto}
-    -- print(inputs)
     local q = prototype:forward(inputs)
     -- Find the max index (the chosen action).
     local max, index = torch.max(q[2][1], 1) -- [2] is the output, [1] is RNN state
@@ -296,7 +296,7 @@ local function performLearningStep(epoch)
     -- if it is a successful sequence, record it and the learn
     if reward > 0 then 
         -- shift sequence so end of game is last item in list:
-        sSeq, aSeq = shiftSeq(sSeq, aSeq, steps))
+        sSeq, aSeq = shiftSeq(sSeq, aSeq, steps)
         -- Remember the transition that was just experienced:
         memory.addTransition(sSeq, aSeq, initRNNstate)
         -- learning step:
@@ -306,6 +306,10 @@ local function performLearningStep(epoch)
     else 
         steps = steps+1
     end
+    if steps > opt.nSeq then
+        -- reset step counter and sequence buffers:
+        resetSeqs()
+    end
     
     return eps,  gameOver, reward
 end
@@ -313,7 +317,7 @@ end
 -- Creates and initializes ViZDoom environment:
 local function initializeViZdoom(config_file_path)
     print("Initializing doom...")
-    game = vizdoom.DoomGame()
+    local game = vizdoom.DoomGame()
     game:setViZDoomPath(base_path.."bin/vizdoom")
     game:setDoomGamePath(base_path.."scenarios/freedoom2.wad")
     game:loadConfig(config_file_path)
@@ -334,7 +338,7 @@ local function main()
     local epsilon
 
     -- Create Doom instance:
-    local game = initializeViZdoom(config_file_path)
+    game = initializeViZdoom(config_file_path)
 
     -- Action = which buttons are pressed:
     local n = game:getAvailableButtonsSize()
