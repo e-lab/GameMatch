@@ -212,6 +212,17 @@ local function learnFromMemory()
     end
 end
 
+local function shiftSeq(s, a, steps)
+    local sn = s:clone()
+    local an = a:clone()
+    local shift = opt.nSeq - steps
+    for i=1, opt.nSeq do
+        sn[i] = s[(i-shift-1)%opt.nSeq+1]
+        an[i] = a[(i-shift-1)%opt.nSeq+1]
+    end
+    return sn, an
+end
+
 local steps = 1 -- counts steps to game win
 local sSeq = torch.zeros(opt.nSeq, nbStates) -- store sequence of states in successful run
 local aSeq = torch.ones(opt.nSeq) -- store sequence of actions in successful run
@@ -225,7 +236,7 @@ local function performLearningStep(epoch)
         local start_eps = opt.epsilon
         local end_eps = opt.epsilonMinimumValue
         local const_eps_epochs = 0.1 * opt.epochs  -- 10% of learning time
-        local eps_decay_epochs = 0.8 * opt.epochs  -- 60% of learning time
+        local eps_decay_epochs = 0.8 * opt.epochs  -- 80% of learning time
 
         if epoch < const_eps_epochs then
             return start_eps
@@ -259,6 +270,8 @@ local function performLearningStep(epoch)
     aSeq[steps] = a
     -- if it is a successful sequence, record it and the learn
     if reward > 0 then 
+        -- shift sequence so end of game is last item in list:
+        sSeq, aSeq = shiftSeq(sSeq, aSeq, steps)
         -- Remember the transition that was just experienced:
         memory.addTransition(sSeq, aSeq, initRNNstate)
         -- learning step:
