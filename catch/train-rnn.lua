@@ -27,7 +27,7 @@ opt = lapp [[
   --skipLearning                             skip learning and just test
   --threads               (default 8)        number of threads used by BLAS routines
   --seed                  (default 1)        initial random seed
-  -r,--learningRate       (default 0.00025)  learning rate
+  -r,--learningRate       (default 0.001)    learning rate
   --batchSize             (default 64)       batch size for training
   --maxMemory             (default 1e3)      Experience Replay buffer memory
   --epochs                (default 20)       number of training steps to perform
