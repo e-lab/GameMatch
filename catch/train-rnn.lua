@@ -361,6 +361,8 @@ local function main()
             
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
             logger:add{ logTrain, logTest }
+
+            collectgarbage()
         end
         print("Saving the network weigths to:", opt.saveDir)
             torch.save(opt.saveDir..'/proto-catch-dqn.net', prototype:clone():float():clearState())

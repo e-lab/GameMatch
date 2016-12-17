@@ -282,6 +282,7 @@ local function main()
                     score = 0 
                     game:nextRandomGame()
                     trainEpisodesFinished = trainEpisodesFinished + 1
+                    collectgarbage()
                 end
             end
 
@@ -312,6 +313,7 @@ local function main()
             --           win = image.display({image=screen, zoom=opt.zoom, win=win})
             --         end
             --     end
+            --     collectgarbage()
             --     table.insert(testScores, score)
             -- end
 
@@ -324,6 +326,7 @@ local function main()
             
             -- print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
             -- logger:add{ logTrain, logTest }
+            collectgarbage()
         end
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
