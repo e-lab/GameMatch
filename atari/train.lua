@@ -237,6 +237,7 @@ local function performLearningStep(epoch)
 
     local screen = game:step(gameActions[1], true) -- just step once to start!
     local s1 = screenPreProcess(screen)
+    if opt.useGPU then s1=s1:cuda() end
 
     -- With probability eps make a random action:
     local eps = explorationRate(epoch)
@@ -247,6 +248,7 @@ local function performLearningStep(epoch)
         -- Choose the best action according to the network:
         a = getBestAction(s1)
     end
+    if opt.useGPU then s1=s1:float() end --convert back
     screen, reward, gameOver = game:step(gameActions[a], true)
     s2 = screenPreProcess(screen)
 

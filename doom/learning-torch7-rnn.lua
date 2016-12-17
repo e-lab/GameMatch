@@ -19,7 +19,7 @@ lapp = require 'pl.lapp'
 opt = lapp [[
 
   Game options:
-  --gridSize            (default 20)         default screen resized for neural net input
+  --gridSize            (default 30)         default screen resized for neural net input
   --discount            (default 0.99)       discount factor in learning
   --epsilon             (default 1)          initial value of ϵ-greedy action selection
   --epsilonMinimumValue (default 0.1)        final value of ϵ-greedy action selection
@@ -38,7 +38,7 @@ opt = lapp [[
   --clampReward                              clamp reward to -1, 1
 
   -- Model parameters:
-  --nSeq                  (default 20)       RNN maximum sequence length
+  --nSeq                  (default 100)      RNN maximum sequence length
   --fw                                       Use FastWeights or not
   --nLayers               (default 1)        RNN layers
   --nHidden               (default 128)      RNN hidden size
@@ -51,6 +51,7 @@ opt = lapp [[
   
   Display and save parameters:
   --display                                  display stuff
+  --zoom                  (default 4)        zoom for display
   --saveDir          (default './results')   subdirectory to save experiments in
   --load                  (default '')       load neural network to test
 ]]
@@ -67,7 +68,7 @@ local rnn = require 'RNN'
 
 -- Other parameters:
 local noActionIdx = 2 -- this is the idle action: do nothing in this game
-local resolution = {opt.gridSize, opt.gridSize*1.5} -- Y, X sizes of rescaled state / game screen
+local resolution = {opt.gridSize*1.5, opt.gridSize} -- Y, X sizes of rescaled state / game screen
 local nbStates = resolution[1]*resolution[2] -- size of RNN input vector (game state treated as vector here)
 
 local colors = sys.COLORS
@@ -246,6 +247,7 @@ local function shiftSeq(s, a, steps)
     return sn, an
 end
 
+local win -- window for displaying results
 local steps = 1 -- counts steps to game win
 local sSeq = torch.zeros(opt.nSeq, nbStates) -- store sequence of states in successful run
 local aSeq = torch.ones(opt.nSeq) -- store sequence of actions in successful run
@@ -277,6 +279,8 @@ local function performLearningStep(epoch)
     local a, reward, gameOver, RNNstate
     local state = preprocess(game:getState().screenBuffer)
 
+    if opt.display then win=image.display({image=state, win=win, zoom=opt.zoom}) end
+
     -- With probability eps make a random action:
     local eps = explorationRate(epoch)
     -- Choose the best action according to the network:
@@ -303,12 +307,14 @@ local function performLearningStep(epoch)
         learnFromMemory()
         -- reset step counter and sequence buffers:
         resetSeqs()
+        collectgarbage()
     else 
         steps = steps+1
     end
     if steps > opt.nSeq then
         -- reset step counter and sequence buffers:
         resetSeqs()
+        collectgarbage()
     end
     
     return eps,  gameOver, reward
@@ -368,6 +374,7 @@ local function main()
                     trainEpisodesFinished = trainEpisodesFinished + 1
                     resetProtoState() -- reset prototype RNN state after each new game
                 end
+                collectgarbage()
             end
 
             -- print(string.format("%d training episodes played.", trainEpisodesFinished))
@@ -395,6 +402,7 @@ local function main()
                     end
                     local r = game:getTotalReward()
                     table.insert(testScores, r)
+                    collectgarbage()
                 end
 
                 testScores = torch.Tensor(testScores)
@@ -407,6 +415,7 @@ local function main()
 
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
             logger:add{ logTrain, logTest }
+            collectgarbage()
         end
         print("Saving the network weigths to:", opt.saveDir)
             torch.save(opt.saveDir..'/proto-catch-dqn.net', prototype:clone():float():clearState())
