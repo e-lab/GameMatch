@@ -38,3 +38,5 @@ Directories:
 ## Notes:
 
 Note1: RNN in Catch works on grid of 10 x 10 because we know exactly how long the sequence is going to be it is always gridSize-2! in other games this is not possible
+
+FIXED: just needed to shift sequences so reward is at the end!

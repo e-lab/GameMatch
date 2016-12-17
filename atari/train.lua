@@ -104,10 +104,10 @@ local function ReplayMemory(capacity)
 
     function memory.addTransition(s1, action, s2, isterminal, reward)
         if memory.pos == 0 then memory.pos = 1 end -- tensors do not have 0 index items!
-        memory.s1[{memory.pos, {}}] = s1
+        memory.s1[{memory.pos, {}}] = s1:clone()
         memory.a[memory.pos] = action
         if not isterminal then
-            memory.s2[{memory.pos, {}}] = s2
+            memory.s2[{memory.pos, {}}] = s2:clone()
         end
         memory.isterminal[memory.pos] = isterminal and 1 or 0 -- boolean stored as 0 or 1 in memory!
         memory.r[memory.pos] = reward
@@ -119,8 +119,8 @@ local function ReplayMemory(capacity)
     function memory.getSample(sampleSize)
         for i=1,sampleSize do
             local ri = torch.random(1, memory.size-1)
-            memory.bs1[i] = memory.s1[ri]
-            memory.bs2[i] = memory.s2[ri]
+            memory.bs1[i] = memory.s1[ri]:clone()
+            memory.bs2[i] = memory.s2[ri]:clone()
             memory.ba[i] = memory.a[ri]
             memory.bisterminal[i] = memory.isterminal[ri]
             memory.br[i] = memory.r[ri]
@@ -144,7 +144,7 @@ local function createNetwork(nAvailableActions)
     model:add(nn.View(64))
     model:add(nn.Linear(64, nbActions))
     -- test:
-    local retvt = model:forward(torch.Tensor(1, gridSize, gridSize))
+    local retvt = model:forward(torch.Tensor(1, gridSize, gridSize)) --test
     -- print('test model:', retvt)
     print('Model to train:', model)
 
