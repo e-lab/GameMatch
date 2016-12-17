@@ -307,14 +307,12 @@ local function performLearningStep(epoch)
         learnFromMemory()
         -- reset step counter and sequence buffers:
         resetSeqs()
-        collectgarbage()
     else 
         steps = steps+1
     end
     if steps > opt.nSeq then
         -- reset step counter and sequence buffers:
         resetSeqs()
-        collectgarbage()
     end
     
     return eps,  gameOver, reward
@@ -337,11 +335,11 @@ local function initializeViZdoom(config_file_path)
 end
 
 
-local logger = optim.Logger(opt.saveDir..'/model-catch-dqn.log')
+local logger = optim.Logger(opt.saveDir..'/-doom-rnn.log')
 logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
 
 local function main()
-    local epsilon
+    local epsilon, logTrain, logTest
 
     -- Create Doom instance:
     game = initializeViZdoom(config_file_path)
@@ -373,15 +371,14 @@ local function main()
                     game:newEpisode()
                     trainEpisodesFinished = trainEpisodesFinished + 1
                     resetProtoState() -- reset prototype RNN state after each new game
+                    collectgarbage()
                 end
-                collectgarbage()
             end
 
             -- print(string.format("%d training episodes played.", trainEpisodesFinished))
 
             trainScores = torch.Tensor(trainScores)
-
-            local logTrain = trainScores:gt(0):sum()/trainEpisodesFinished*100
+            logTrain = trainScores:gt(0):sum()/trainEpisodesFinished*100
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
                 trainScores:mean(), trainScores:std(), trainScores:min(), trainScores:max()))
             print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
@@ -406,11 +403,10 @@ local function main()
                 end
 
                 testScores = torch.Tensor(testScores)
+                logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
                 print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                     testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
-                local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
-                print(string.format("Games played: %d, Accuracy: %d %%", 
-                    opt.testEpisodesEpoch, logTest))
+                print(string.format("Games played: %d, Accuracy: %d %%", opt.testEpisodesEpoch, logTest))
             end
 
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
@@ -418,7 +414,7 @@ local function main()
             collectgarbage()
         end
         print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/proto-catch-dqn.net', prototype:clone():float():clearState())
+            torch.save(opt.saveDir..'/proto-doom-rnn.net', prototype:clone():float():clearState())
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
         prototype = torch.load(opt.load) -- otherwise load network to test!
