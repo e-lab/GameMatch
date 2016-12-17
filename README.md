@@ -16,7 +16,7 @@ Directories:
 
 ### Atari:
 
-- DQN CNN script functional, all code tested, but no good results
+- DQN CNN script working
 - RNN script some good results, needs more testing
 
 

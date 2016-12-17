@@ -1,6 +1,5 @@
 # Atari
 
-NOT WORKING - DO NOT USE!!!!
 
 ## installation
 
@@ -13,17 +12,19 @@ To install dependencies run bellow with elab account
 sh installDependencies.sh
 ```
 
-## training a new RL model
+## training a new DQN / CNN model
 
-`qlua train.lua --display` to display output game locally on CPU.
+`th train.lua`, takes 100 epochs.
 
 `qlua train.lua --display --useGPU` to display output game locally on GPU.
 
-`th train.lua --useGPU` to train on remote server with no display on GPU.
 
-Inspired by: https://github.com/kuz/DeepMind-Atari-Deep-Q-Learner
+## training an RNN model
 
-Note: even after a long long time it does not train on breakout!
-##To save playinf frames from atari
+`th train-rnn.lua`
+
+
+
+##To save playing frames from atari
 
 run play.lua with qlua then it will save frames and action under save folder
