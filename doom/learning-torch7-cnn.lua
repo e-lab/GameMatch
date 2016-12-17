@@ -258,7 +258,11 @@ local function initializeViZdoom(config_file_path)
     return game
 end
 
+local logger = optim.Logger(opt.saveDir..'/model-doom-dqn.log')
+logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
+
 local function main()
+    local logTrain, logTest
     -- Create Doom instance:
     local game = initializeViZdoom(config_file_path)
 
@@ -296,10 +300,11 @@ local function main()
             print(string.format("%d training episodes played.", trainEpisodesFinished))
 
             trainScores = torch.Tensor(trainScores)
-
+            logTrain = trainScores:gt(0):sum()/trainEpisodesFinished*100
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f", 
                 trainScores:mean(), trainScores:std(), trainScores:min(), trainScores:max()))
-            -- print('Epsilon value', epsilon)
+            print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
+            print('Epsilon value', epsilon)
 
             print(colors.red.."\nTesting...")
             local testEpisode = {}
@@ -318,17 +323,21 @@ local function main()
             end
 
             testScores = torch.Tensor(testScores)
+            logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
             print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
                 testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
-
-            print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/model-cnn-dqn-'..epoch..'.net', model:float():clearState())
+            print(string.format("Games played: %d, Accuracy: %d %%", opt.testEpisodesEpoch, logTest))
             
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            logger:add{ logTrain, logTest }
+            collectgarbage()
         end
+        print("Saving the network weigths to:", opt.saveDir)
+            torch.save(opt.saveDir..'/model-cnn-dqn.net', model:clone():float():clearState())
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
         model = torch.load(opt.load) -- otherwise load network to test!
+        print('Loaded model is:', model)
     end
     
     game:close()
