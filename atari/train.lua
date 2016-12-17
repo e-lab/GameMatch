@@ -119,8 +119,8 @@ local function ReplayMemory(capacity)
     function memory.getSample(sampleSize)
         for i=1,sampleSize do
             local ri = torch.random(1, memory.size-1)
-            memory.bs1[i] = memory.s1[ri]:clone()
-            memory.bs2[i] = memory.s2[ri]:clone()
+            memory.bs1[i] = memory.s1[ri]
+            memory.bs2[i] = memory.s2[ri]
             memory.ba[i] = memory.a[ri]
             memory.bisterminal[i] = memory.isterminal[ri]
             memory.br[i] = memory.r[ri]
@@ -139,10 +139,10 @@ local function createNetwork(nAvailableActions)
 
     -- Create the base model:
     model = nn.Sequential()
-    model:add(nn.SpatialConvolution(1,32,8,8,4,4))
-    model:add(nn.SpatialConvolution(32,64,4,4,2,2))
-    model:add(nn.View(64))
-    model:add(nn.Linear(64, nbActions))
+    model:add(nn.SpatialConvolution(1,8,8,8,4,4))
+    model:add(nn.SpatialConvolution(8,16,4,4,2,2))
+    model:add(nn.View(16))
+    model:add(nn.Linear(16, nbActions))
     -- test:
     local retvt = model:forward(torch.Tensor(1, gridSize, gridSize)) --test
     -- print('test model:', retvt)
