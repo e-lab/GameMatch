@@ -292,7 +292,7 @@ local function performLearningStep(epoch)
 end
 
 
-local logger = optim.Logger(opt.saveDir..'/model-catch-dqn.log')
+local logger = optim.Logger(opt.saveDir..'/proto-catch-rnn.log')
 logger:setNames{'Training acc. %', 'Test acc. %'} -- log train / test accuracy in percent [%]
 
 local function main()
@@ -365,7 +365,7 @@ local function main()
             collectgarbage()
         end
         print("Saving the network weigths to:", opt.saveDir)
-            torch.save(opt.saveDir..'/proto-catch-dqn.net', prototype:clone():float():clearState())
+            torch.save(opt.saveDir..'/proto-catch-rnn.net', prototype:clone():float():clearState())
     else
         if opt.load == '' then print('Missing neural net file to load!') os.exit() end
         prototype = torch.load(opt.load) -- otherwise load network to test!
