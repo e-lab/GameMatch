@@ -62,6 +62,15 @@ torch.save(paths.concat(opt.saveDir,'opt.t7'),opt)
 -- Other parameters:
 local colors = sys.COLORS
 
+-- use GPU, if desired:
+if opt.useGPU then
+  require 'cunn'
+  cutorch.setDevice(opt.gpuId)
+  local firstRandInt = torch.random()
+  cutorch.manualSeed(firstRandInt) -- set cuda random seed
+  print('Using GPU number', opt.gpuId)
+end
+
 -- setup game environment:
 local game, gameActions, agent, opt = gameEnvSetup(opt)
 print(string.format(colors.green..'Atari game environment started. Number of game actions: %d', #gameActions))
@@ -149,6 +158,7 @@ local function createNetwork(nAvailableActions)
     print('Model to train:', model)
 
     criterion = nn.MSECriterion()
+    if opt.useGPU then model = model:cuda() criterion = criterion:cuda() end
 end
 
 local function learnBatch(state, targets)
@@ -186,6 +196,7 @@ local function learnFromMemory()
     -- Get a random minibatch from the replay memory and learns from it:
     if memory.size > opt.batchSize then
         local s1, a, s2, isterminal, r = memory.getSample(opt.batchSize)
+        if opt.useGPU then s1=s1:cuda() s2=s2:cuda() end
         if opt.clampReward then r = r:clamp(-1,1) end -- clamping of reward!
 
         local q2 = torch.max(getQValues(s2), 2) -- get max q for each sample of batch
@@ -196,7 +207,9 @@ local function learnFromMemory()
         for i=1,opt.batchSize do
             target_q[i][a[i]] = r[i] + opt.discount * (1 - isterminal[i]) * q2[i]
         end
+        if opt.useGPU then target_q= target_q:cuda() end
         learnBatch(s1, target_q)
+        -- if opt.GPU then s1 = s1:float() end
     end
 end
 

@@ -14,9 +14,9 @@ sh installDependencies.sh
 
 ## training a new DQN / CNN model
 
-`th train.lua`, takes 100 epochs.
+`th train.lua`, to train on CPU for 100 epochs.
 
-`qlua train.lua --display --useGPU` to display output game locally on GPU.
+`th train.lua --useGPU --batchSize 256` to train on GPU (increase batch size here for faster learning).
 
 
 ## training an RNN model
