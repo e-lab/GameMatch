@@ -297,8 +297,8 @@ local function main()
                     score = 0 
                     game:nextRandomGame()
                     trainEpisodesFinished = trainEpisodesFinished + 1
-                    collectgarbage()
                 end
+                if learningStep % 1000 == 0 then collectgarbage() end
             end
 
             print(string.format("%d training episodes played.", trainEpisodesFinished))
@@ -376,6 +376,7 @@ local function main()
             if opt.display then 
                 win = image.display({image=screen, zoom=opt.zoom, win=win})
             end
+            collectgarbage()
             sys.sleep(0.1) -- slow down game
         end
 
