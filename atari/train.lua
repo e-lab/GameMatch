@@ -322,6 +322,7 @@ local function main()
                 game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
                 while not gameOver do
                     local state = screenPreProcess(screen)
+                    if opt.useGPU then state=state:cuda() end
                     local bestActionIndex = getBestAction(state)
                     -- random move every now and then to prevent getting stuck
                     if torch.uniform() < opt.epsilonMinimumValue then bestActionIndex = torch.random(1, nbActions) end 
@@ -365,8 +366,8 @@ local function main()
         game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
         while not gameOver do
             local state = screenPreProcess(screen)
+            if opt.useGPU then state=state:cuda() end
             local action = getBestAction(state)
-            print(action)
             -- random move every now and then to prevent getting stuck
             if torch.uniform() < opt.epsilonMinimumValue then action = torch.random(1, nbActions) end 
             -- play game in test mode (episodes don't end when losing a life)
