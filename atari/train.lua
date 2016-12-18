@@ -319,6 +319,7 @@ local function main()
             --     screen = game:nextRandomGame()
             --     score = 0
             --     gameOver = false
+            --     game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
             --     while not gameOver do
             --         local state = screenPreProcess(screen)
             --         local bestActionIndex = getBestAction(state)
@@ -359,9 +360,11 @@ local function main()
         screen = game:nextRandomGame()
         score = 0
         gameOver = false
+        game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
         while not gameOver do
             local state = screenPreProcess(screen)
             local action = getBestAction(state)
+            print(action)
             -- play game in test mode (episodes don't end when losing a life)
             state, reward, gameOver = game:step(gameActions[action], false)
             score = score + reward
