@@ -16,7 +16,7 @@ opt = lapp [[
   --gridSize            (default 20)          game grid size 
   --discount            (default 0.99)        discount factor in learning
   --epsilon             (default 1)           initial value of ϵ-greedy action selection
-  --epsilonMinimumValue (default 0.1)         final value of ϵ-greedy action selection
+  --epsilonMinimumValue (default 0.05)        final value of ϵ-greedy action selection
   --playFile            (default '')          human play file to initialize exp. replay memory
   --framework           (default 'alewrap')         name of training framework
   --env                 (default 'breakout')        name of environment to use')
@@ -32,10 +32,10 @@ opt = lapp [[
   --threads               (default 8)         number of threads used by BLAS routines
   --seed                  (default 1)         initial random seed
   -r,--learningRate       (default 0.00025)   learning rate
-  --batchSize             (default 64)        batch size for training
-  --maxMemory             (default 1e4)       Experience Replay buffer memory
+  --batchSize             (default 128)       batch size for training
+  --maxMemory             (default 1e5)       Experience Replay buffer memory
   --epochs                (default 100)       number of training steps to perform
-  --learningStepsEpoch    (default 5000)      Learning steps per epoch
+  --learningStepsEpoch    (default 10000)     Learning steps per epoch
   --testEpisodesEpoch     (default 100)       test episodes per epoch
   --episodesWatch         (default 10)        episodes to watch after training
   --clampReward                               clamp reward to -1, 1
@@ -221,8 +221,8 @@ local function performLearningStep(epoch)
         --  Define exploration rate change over time:
         local start_eps = opt.epsilon
         local end_eps = opt.epsilonMinimumValue
-        local const_eps_epochs = 0.1 * opt.epochs  -- 10% of learning time
-        local eps_decay_epochs = 0.8 * opt.epochs  -- 80% of learning time
+        local const_eps_epochs = 0 * opt.epochs  -- 0% of learning time
+        local eps_decay_epochs = 1 * opt.epochs  -- 100% of learning time
 
         if epoch < const_eps_epochs then
             return start_eps
@@ -311,37 +311,39 @@ local function main()
             print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
             print('Epsilon value', epsilon)
 
-            -- print(colors.red.."\nTesting...")
-            -- local testEpisode = {}
-            -- local testScores = {}
-            -- for testEpisode = 1, opt.testEpisodesEpoch do
-            --     xlua.progress(testEpisode, opt.testEpisodesEpoch)
-            --     screen = game:nextRandomGame()
-            --     score = 0
-            --     gameOver = false
-            --     game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
-            --     while not gameOver do
-            --         local state = screenPreProcess(screen)
-            --         local bestActionIndex = getBestAction(state)
-            --         state, reward, gameOver = game:step(gameActions[bestActionIndex], true)
-            --         score = score + reward
-            --         if opt.display then 
-            --           win = image.display({image=screen, zoom=opt.zoom, win=win})
-            --         end
-            --     end
-            --     collectgarbage()
-            --     table.insert(testScores, score)
-            -- end
+            print(colors.red.."\nTesting...")
+            local testEpisode = {}
+            local testScores = {}
+            for testEpisode = 1, opt.testEpisodesEpoch do
+                xlua.progress(testEpisode, opt.testEpisodesEpoch)
+                screen = game:newGame()
+                score = 0
+                gameOver = false
+                game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
+                while not gameOver do
+                    local state = screenPreProcess(screen)
+                    local bestActionIndex = getBestAction(state)
+                    -- random move every now and then to prevent getting stuck
+                    if torch.uniform() < opt.epsilonMinimumValue then bestActionIndex = torch.random(1, nbActions) end 
+                    state, reward, gameOver = game:step(gameActions[bestActionIndex])
+                    score = score + reward
+                    if opt.display then 
+                      win = image.display({image=screen, zoom=opt.zoom, win=win})
+                    end
+                end
+                collectgarbage()
+                table.insert(testScores, score)
+            end
 
-            -- testScores = torch.Tensor(testScores)
-            -- print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
-            --     testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
-            -- local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
-            -- print(string.format("Games played: %d, Accuracy: %d %%", 
-            --     opt.testEpisodesEpoch, logTest))
+            testScores = torch.Tensor(testScores)
+            print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
+                testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
+            local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
+            print(string.format("Games played: %d, Accuracy: %d %%", 
+                opt.testEpisodesEpoch, logTest))
             
-            -- print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
-            -- logger:add{ logTrain, logTest }
+            print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
+            logger:add{ logTrain, logTest }
             collectgarbage()
         end
     else
@@ -357,7 +359,7 @@ local function main()
     print("Training finished. It's time to watch!")
 
     for i = 1, opt.episodesWatch do
-        screen = game:nextRandomGame()
+        screen = game:newGame()
         score = 0
         gameOver = false
         game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
@@ -365,6 +367,8 @@ local function main()
             local state = screenPreProcess(screen)
             local action = getBestAction(state)
             print(action)
+            -- random move every now and then to prevent getting stuck
+            if torch.uniform() < opt.epsilonMinimumValue then action = torch.random(1, nbActions) end 
             -- play game in test mode (episodes don't end when losing a life)
             state, reward, gameOver = game:step(gameActions[action], false)
             score = score + reward
