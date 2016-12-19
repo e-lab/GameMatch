@@ -10,7 +10,6 @@ require 'torch'
 require 'nn'
 require 'nngraph'
 require 'image'
-require 'model'
 require 'optim'
 
 

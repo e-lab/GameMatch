@@ -85,7 +85,8 @@ local function screenPreProcess(inImage)
   -- this is the general case: whole screen:
   -- return image.scale(inImage[1], gridSize, gridSize, 'simple'):sum(1):div(3) -- we also convert to B/W from color
   -- this is a simple version looking just at the inside grid:
-  local pooled = poolnet:forward(inImage[1][{{},{94,194},{9,152}}])
+  if opt.env == 'breakout' then pooled = poolnet:forward(inImage[1][{{},{94,194},{9,152}}]) end
+  if opt.env == 'enduro' then pooled = poolnet:forward(inImage[1][{{},{94,194},{9,152}}]) end
   local outImage = image.scale(pooled, opt.gridSize, opt.gridSize):sum(1):div(3)
   return outImage
 end
@@ -291,6 +292,7 @@ local function main()
             for learningStep = 1, opt.learningStepsEpoch do
                 xlua.progress(learningStep, opt.learningStepsEpoch)
                 epsilon, gameOver, reward = performLearningStep(epoch)
+                print(reward, gameOver)
                 score = score + reward
                 if gameOver then
                     table.insert(trainScores, score)
@@ -314,35 +316,37 @@ local function main()
             print(colors.red.."\nTesting...")
             local testEpisode = {}
             local testScores = {}
-            for testEpisode = 1, opt.testEpisodesEpoch do
-                xlua.progress(testEpisode, opt.testEpisodesEpoch)
-                screen = game:newGame()
-                score = 0
-                gameOver = false
-                game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
-                while not gameOver do
-                    local state = screenPreProcess(screen)
-                    if opt.useGPU then state=state:cuda() end
-                    local bestActionIndex = getBestAction(state)
-                    -- random move every now and then to prevent getting stuck
-                    if torch.uniform() < opt.epsilonMinimumValue then bestActionIndex = torch.random(1, nbActions) end 
-                    state, reward, gameOver = game:step(gameActions[bestActionIndex])
-                    score = score + reward
-                    if opt.display then 
-                      win = image.display({image=screen, zoom=opt.zoom, win=win})
+            if opt.testEpisodesEpoch > 0  and epoch > 2 then
+                for testEpisode = 1, opt.testEpisodesEpoch do
+                    xlua.progress(testEpisode, opt.testEpisodesEpoch)
+                    screen = game:newGame()
+                    score = 0
+                    gameOver = false
+                    game:step(gameActions[2],false) -- start game move, otherwise gets stuck! 
+                    while not gameOver do
+                        local state = screenPreProcess(screen)
+                        if opt.useGPU then state=state:cuda() end
+                        local bestActionIndex = getBestAction(state)
+                        -- random move every now and then to prevent getting stuck
+                        if torch.uniform() < opt.epsilonMinimumValue then bestActionIndex = torch.random(1, nbActions) end 
+                        state, reward, gameOver = game:step(gameActions[bestActionIndex])
+                        score = score + reward
+                        if opt.display then 
+                          win = image.display({image=screen, zoom=opt.zoom, win=win})
+                        end
                     end
+                    collectgarbage()
+                    table.insert(testScores, score)
                 end
-                collectgarbage()
-                table.insert(testScores, score)
+
+                testScores = torch.Tensor(testScores)
+                print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
+                    testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
+                local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
+                print(string.format("Games played: %d, Accuracy: %d %%", 
+                    opt.testEpisodesEpoch, logTest))
             end
 
-            testScores = torch.Tensor(testScores)
-            print(string.format("Results: mean: %.1f, std: %.1f, min: %.1f, max: %.1f",
-                testScores:mean(), testScores:std(), testScores:min(), testScores:max()))
-            local logTest = testScores:gt(0):sum()/opt.testEpisodesEpoch*100
-            print(string.format("Games played: %d, Accuracy: %d %%", 
-                opt.testEpisodesEpoch, logTest))
-            
             print(string.format(colors.cyan.."Total elapsed time: %.2f minutes", sys.toc()/60.0))
             logger:add{ logTrain, logTest }
             collectgarbage()
