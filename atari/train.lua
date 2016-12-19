@@ -292,7 +292,6 @@ local function main()
             for learningStep = 1, opt.learningStepsEpoch do
                 xlua.progress(learningStep, opt.learningStepsEpoch)
                 epsilon, gameOver, reward = performLearningStep(epoch)
-                print(reward, gameOver)
                 score = score + reward
                 if gameOver then
                     table.insert(trainScores, score)
