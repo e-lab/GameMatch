@@ -35,7 +35,7 @@ opt = lapp [[
   --testEpisodesEpoch     (default 100)      test episodes per epoch
   --episodesWatch         (default 10)       episodes to watch after training
 
-  -- Model parameters:
+  Model parameters:
   --fw                                       Use FastWeights or not
   --nLayers               (default 1)        RNN layers
   --nHidden               (default 128)      RNN hidden size
@@ -268,7 +268,7 @@ local function performLearningStep(epoch)
     _, reward, gameOver = game.act(a)
 
     -- save sequences:
-    sSeq[steps] = state:clone()
+    sSeq[steps] = state
     aSeq[steps] = a
 
     -- if it is a successful sequence, record it and the learn
