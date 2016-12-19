@@ -312,10 +312,10 @@ local function main()
             print(string.format("Games played: %d, Accuracy: %d %%", trainEpisodesFinished, logTrain))
             print('Epsilon value', epsilon)
 
-            print(colors.red.."\nTesting...")
-            local testEpisode = {}
-            local testScores = {}
             if opt.testEpisodesEpoch > 0  and epoch > 2 then
+                print(colors.red.."\nTesting...")
+                local testEpisode = {}
+                local testScores = {}
                 for testEpisode = 1, opt.testEpisodesEpoch do
                     xlua.progress(testEpisode, opt.testEpisodesEpoch)
                     screen = game:newGame()
