@@ -34,7 +34,6 @@ opt = lapp [[
   --learningStepsEpoch    (default 2000)     Learning steps per epoch
   --testEpisodesEpoch     (default 100)      test episodes per epoch
   --episodesWatch         (default 10)       episodes to watch after training
-  --clampReward                              clamp reward to -1, 1
 
   -- Model parameters:
   --fw                                       Use FastWeights or not

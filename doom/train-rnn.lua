@@ -30,13 +30,13 @@ opt = lapp [[
   --seed                  (default 1)        initial random seed
   -r,--learningRate       (default 0.001)    learning rate
   --batchSize             (default 64)       batch size for training
-  --maxMemory             (default 1e4)      Experience Replay buffer memory
+  --maxMemory             (default 1e3)      Experience Replay buffer memory
   --epochs                (default 20)       number of training steps to perform
-
-  -- Q-learning settings:
   --learningStepsEpoch    (default 2000)     Learning steps per epoch
-  --clampReward                              clamp reward to -1, 1
-
+  --testEpisodesEpoch     (default 100)      test episodes per epoch
+  --frameRepeat           (default 12)       repeat frames / actions N times
+  --episodesWatch         (default 10)       episodes to watch after training
+  
   -- Model parameters:
   --nSeq                  (default 100)      RNN maximum sequence length
   --fw                                       Use FastWeights or not
@@ -44,10 +44,6 @@ opt = lapp [[
   --nHidden               (default 128)      RNN hidden size
   --nFW                   (default 8)        number of fast weights previous vectors
 
-  -- Training regime
-  --testEpisodesEpoch     (default 100)      test episodes per epoch
-  --frameRepeat           (default 12)       repeat frames / actions N times
-  --episodesWatch         (default 10)       episodes to watch after training
   
   Display and save parameters:
   --display                                  display stuff
@@ -277,9 +273,7 @@ local function performLearningStep(epoch)
     local function resetSeqs() steps = 1 sSeq:zero() aSeq:fill(noActionIdx) end -- fill with noActionIdx
 
     local state = preprocess(game:getState().screenBuffer)
-
     if opt.display then win=image.display({image=state, win=win, zoom=opt.zoom}) end
-
     -- With probability eps make a random action:
     local eps = explorationRate(epoch)
     -- Choose the best action according to the network:
@@ -294,13 +288,10 @@ local function performLearningStep(epoch)
 
     -- save sequences:
     sSeq[steps] = state:clone()
-    aSeq[steps] = a
-
-sys.sleep(0.05)    
+    aSeq[steps] = a    
     
     -- if it is a successful sequence, record it and the learn
     if reward > 0 then 
-        -- print(reward, steps) io.read()
         -- shift sequence so end of game is last item in list:
         sSeq, aSeq = shiftSeq(sSeq, aSeq, steps)
         -- Remember the transition that was just experienced:
