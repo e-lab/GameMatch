@@ -91,9 +91,9 @@ local function ReplayMemory(capacity)
     
     function memory.addTransition(state, action, RNNstate)
         if memory.pos == 0 then memory.pos = 1 end -- tensors do not have 0 index items!
-        memory.s[memory.pos] = state:clone()
-        memory.a[memory.pos] = action:clone()
-        memory.rs[memory.pos] = RNNstate:clone()
+        memory.s[memory.pos] = state
+        memory.a[memory.pos] = action
+        memory.rs[memory.pos] = RNNstate
        
         memory.pos = (memory.pos + 1) % memory.capacity
         memory.size = math.min(memory.size + 1, memory.capacity)

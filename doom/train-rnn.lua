@@ -111,9 +111,9 @@ local function ReplayMemory(capacity)
     
     function memory.addTransition(state, action, RNNstate)
         if memory.pos == 0 then memory.pos = 1 end -- tensors do not have 0 index items!
-        memory.s[memory.pos] = state:clone()
-        memory.a[memory.pos] = action:clone()
-        memory.rs[memory.pos] = RNNstate:clone()
+        memory.s[memory.pos] = state
+        memory.a[memory.pos] = action
+        memory.rs[memory.pos] = RNNstate
        
         memory.pos = (memory.pos + 1) % memory.capacity
         memory.size = math.min(memory.size + 1, memory.capacity)
@@ -276,7 +276,6 @@ local function performLearningStep(epoch)
 
     local function resetSeqs() steps = 1 sSeq:zero() aSeq:fill(noActionIdx) end -- fill with noActionIdx
 
-    local a, reward, gameOver, RNNstate
     local state = preprocess(game:getState().screenBuffer)
 
     if opt.display then win=image.display({image=state, win=win, zoom=opt.zoom}) end
@@ -296,9 +295,12 @@ local function performLearningStep(epoch)
     -- save sequences:
     sSeq[steps] = state:clone()
     aSeq[steps] = a
+
+sys.sleep(0.05)    
     
     -- if it is a successful sequence, record it and the learn
     if reward > 0 then 
+        -- print(reward, steps) io.read()
         -- shift sequence so end of game is last item in list:
         sSeq, aSeq = shiftSeq(sSeq, aSeq, steps)
         -- Remember the transition that was just experienced:
@@ -315,7 +317,7 @@ local function performLearningStep(epoch)
         resetSeqs()
     end
     
-    return eps,  gameOver, reward
+    return eps
 end
 
 -- Creates and initializes ViZDoom environment:
