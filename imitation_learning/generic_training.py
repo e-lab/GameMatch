@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim
+from torch.nn.utils import clip_grad_norm_
 import time
 from datetime import timedelta
 
@@ -82,10 +83,20 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
             # print('Validating ', end='', flush=True)
             print('Training on {} data'.format(num_data))
 
+            # set init state for lstm
+            # 1 batch, 1 layer
+            h0 = Variable(torch.zeros(1, 1, 1000)).to(device)
+            c0 = Variable(torch.zeros(1, 1, 1000)).to(device)
+            states = (h0, c0)
+
             for i, data in enumerate(train_loader, 0):
                 index = 0
 
                 inputs, labels = data
+                # labels = torch.stack(labels)
+                # print(inputs.size(), labels.size())
+
+                inputs, labels = inputs.squeeze(0), labels.squeeze()
 
                 # wrap inputs and labels in variables
                 inputs, labels = Variable(inputs).to(device), \
@@ -95,7 +106,12 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
                 optimizer.zero_grad()
 
                 # forward + backward + optimize
-                outputs = model(inputs)
+                # detach previous states from the graph to truncate backprop
+                states = [state.detach() for state in states]
+
+                outputs, states = model(inputs, states)
+
+                # print(outputs.size(), labels.size())
 
                 loss = criterion(outputs, labels)
 
@@ -105,11 +121,19 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
 
                 loss.backward()
 
+                # clip gradients to avoid gradient explosion or vanishing
+                clip_grad_norm_(model.parameters(), 0.5)
+
+                # update parameters
                 optimizer.step()
 
                 if i % 20 == 0:
                     print("Progress {:2.1%}".format(i * batch_size / num_data), end="\r")
                     print(loss)
+                    grad = torch.cat([p.grad.view(1,-1).squeeze().cpu() for p in model.parameters()])
+                    # print(torch.histc(gradients, bins=10, max=0.01, min=-0.01))
+                    print('max: %.5f\tmin: %.5f\tmean: %.7f\tmedian: %.2f' % (grad.max(), grad.min(), \
+                            grad.mean(), grad.median()))
 
             print('Epoch: [{0}]\t'.format(e))
             for k in meters.keys():
@@ -127,6 +151,7 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
 
 
 def validate(model, batch_size, val_loader, topk=(1, 5), cuda=True):
+    device = 'cuda' if cuda else 'cpu'
     # torch.cuda.set_device(0)
     meters = {}
     for i in topk:
@@ -141,16 +166,23 @@ def validate(model, batch_size, val_loader, topk=(1, 5), cuda=True):
     # print('Validating ', end='', flush=True)
     print('Validating on {} data'.format(num_data))
 
+    # init states
+    h0 = Variable(torch.zeros(1, 1, 1000), requires_grad=False).to(device)
+    c0 = Variable(torch.zeros(1, 1, 1000), requires_grad=False).to(device)
+    states = (h0, c0)
+
     for i, (input, target) in enumerate(val_loader):
-        if cuda:
-            input = input.cuda()
-            target = target.cuda(non_blocking=True)
+        input = input.squeeze(0).to(device)
+        target = target.squeeze().to(device)
+
         input_var = Variable(input)
         target_var = Variable(target)
 
+        # input_var, target_var = input_var.squeeze(0), target_var.squeeze(0)
+
         # print(input_var.size(), target_var.size())
 
-        output = model(input_var)
+        output, states = model(input_var, states)
 
         # measure accuracy
         result = accuracy(output.data, target, topk)
@@ -195,6 +227,7 @@ def accuracy(output, target, topk=(1,)):
 
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
+    # print(pred, target)
 
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 

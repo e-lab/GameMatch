@@ -18,7 +18,7 @@ class ALSTM(nn.Module):
             ,nn.Softmax())
 
 
-    def forward(self, x):
+    def forward(self, x, states):
         x = self.features(x)
 
         x = x.view(x.size(0), 256 * 6 * 6)
@@ -27,14 +27,14 @@ class ALSTM(nn.Module):
 
         x = x.unsqueeze(0)
 
-        h0 = Variable(torch.zeros(1, 1, 1000))
-        c0 = Variable(torch.zeros(1, 1, 1000))
+        # h0 = Variable(torch.zeros(1, 1, 1000))
+        # c0 = Variable(torch.zeros(1, 1, 1000))
 
         # print(x.size())
 
-        x, _ = self.lstm(x, (h0, c0))
+        x, states = self.lstm(x, states)
 
         # now the output should be of dimensions 1 x batch_size x 8
         x = x.squeeze()
 
-        return self.end(x)
+        return self.end(x), states

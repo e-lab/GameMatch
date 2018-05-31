@@ -2,7 +2,7 @@ import sys, os
 sys.path.append(os.getcwd())
 import json
 from random import sample
-from dataset import DataFromJSON as DJ 
+from dataset import SeqDataFromJSON as SDJ 
 from collections import OrderedDict
 
 import torch
@@ -26,6 +26,7 @@ def gen_loaders(path, BATCH_SIZE, NUM_WORKERS):
         data = json.loads(json.load(datafile))
 
     train_data = data[:(len(data)*3)//4]
+
     test_data = data[(len(data)*3)//4:]
 
     # define transformation
@@ -36,17 +37,17 @@ def gen_loaders(path, BATCH_SIZE, NUM_WORKERS):
             normalize
     ])
 
-    train_set = DJ(data_path=path, data_list=train_data, transforms=transformations)
+    train_set = SDJ(data_path=path, data_list=train_data, transforms=transformations)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, \
                                                     batch_size=BATCH_SIZE,
-                                                    shuffle=False,
+                                                    shuffle=True,
                                                     num_workers=NUM_WORKERS, 
                                                     pin_memory=True)
 
-    test_set =  DJ(data_path=path, data_list=test_data, transforms=transformations)
+    test_set =  SDJ(data_path=path, data_list=test_data, transforms=transformations)
     test_loader = torch.utils.data.DataLoader(dataset=test_set, \
                                                     batch_size=BATCH_SIZE,
-                                                    shuffle=False,
+                                                    shuffle=True,
                                                     num_workers=NUM_WORKERS, 
                                                     pin_memory=True)
 
@@ -55,8 +56,8 @@ def gen_loaders(path, BATCH_SIZE, NUM_WORKERS):
 
 
 def main():
-    device = 'cpu'
-    BATCH_SIZE = 64
+    device = 'cuda'
+    BATCH_SIZE = 1
 
     datapath = 'data/'
     train_loader, test_loader = gen_loaders(datapath, BATCH_SIZE, 4)
@@ -65,11 +66,11 @@ def main():
     use_model, use_state = False, False
     net = ALSTM()
 
-    lr = 1e-2
+    lr = 0.005
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
     epoch = 0
 
-    # net = nn.DataParallel(net).to(device)
+    net = nn.DataParallel(net).to(device)
 
     criterion = nn.CrossEntropyLoss().to(device)
 
@@ -89,7 +90,7 @@ def main():
     train_args['saved_epoch'] = 0 
     train_args['log'] = 'imitation_lstm1.csv'
     train_args['pname'] = 'imitation_lstm1_best.pth'
-    train_args['cuda'] = False
+    train_args['cuda'] = (device == 'cuda')
 
     train(*train_args.values())
 

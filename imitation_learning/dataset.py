@@ -47,6 +47,55 @@ class DataFromJSON(Dataset):
     def __len__(self):
         return len(self.data)
 
+
+class SeqDataFromJSON(Dataset):
+    def __init__(self, data_path=None, data_list=None, seq_len=16, transforms=None):
+        self.data_path = data_path
+        self.data_list = data_list
+
+        if data_path and not data_list:
+            with open(data_path + 'data.json', 'r') as datafile:
+                # loads will create a list of dictionaries
+                self.data = json.loads(json.load(datafile))
+        if data_list:
+            self.data = data_list
+
+        # now we create list of sequences
+        self.data = [self.data[i:i+seq_len] for i in range(0, len(self.data)-seq_len+1, seq_len)]
+        
+        self.seq_len = seq_len
+        
+        self.transforms = transforms
+
+    def __getitem__(self, index):
+        islice = self.data[index]
+        imgs = []
+        actions = []
+        for item in islice:
+            tfname = self.data_path + 'screens/'+item['screen']
+            # the img_tensor will be a numpy array
+            img_arr = torch.load(tfname)
+            img = Image.fromarray(img_arr.astype('uint8'), 'RGB')
+            if self.transforms:
+                img_tensor = self.transforms(img)
+
+            imgs.append(img_tensor)
+
+            # action should be a list of numbers
+            action = item['action']
+            hot = int(sum([action[i]*(2**i) for i in range(len(action))]))
+
+            actions.append(hot)
+
+        imgs = torch.stack(imgs)
+        actions = torch.LongTensor(actions)
+
+        return (imgs, actions)
+
+
+    def __len__(self):
+        return len(self.data)
+
 '''
 if __name__ == '__main__':
     # define transformation
