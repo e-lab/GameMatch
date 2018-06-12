@@ -14,7 +14,7 @@ import time
 from datetime import timedelta
 
 
-def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
+def train(model, rnn, train_loader, val_loader, batch_size, criterion, optimizer, \
         target_accr=None, err_margin=(0.01, 0.01), best_accr=(0, 0), topk=(1, 5), lr_decay=0.1, \
         saved_epoch=0, log='train.csv', pname='model.pth', cuda=True):
 
@@ -46,7 +46,7 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
     while True:
         model.eval()
 
-        result = tuple(validate(model, batch_size, val_loader, topk, cuda))
+        result = tuple(validate(model, rnn, batch_size, val_loader, topk, cuda))
 
         # if the current accuracy is better than the best accuracy
         if len(list(filter(lambda t: t[0] > t[1], zip(best_accr, result)))) == 0:
@@ -83,11 +83,12 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
             # print('Validating ', end='', flush=True)
             print('Training on {} data'.format(num_data))
 
-            # set init state for lstm
-            # 1 batch, 1 layer
-            h0 = Variable(torch.zeros(1, 1, 1000)).to(device)
-            c0 = Variable(torch.zeros(1, 1, 1000)).to(device)
-            states = (h0, c0)
+            if rnn:
+                # set init state for lstm
+                # 1 batch, 1 layer
+                h0 = Variable(torch.zeros(1, 1, 8)).to(device)
+                c0 = Variable(torch.zeros(1, 1, 8)).to(device)
+                states = (h0, c0)
 
             for i, data in enumerate(train_loader, 0):
                 index = 0
@@ -96,7 +97,8 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
                 # labels = torch.stack(labels)
                 # print(inputs.size(), labels.size())
 
-                inputs, labels = inputs.squeeze(0), labels.squeeze()
+                if rnn:
+                    inputs, labels = inputs.squeeze(0), labels.squeeze()
 
                 # wrap inputs and labels in variables
                 inputs, labels = Variable(inputs).to(device), \
@@ -104,12 +106,17 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
 
                 # zero the param gradient
                 optimizer.zero_grad()
+                model.zero_grad()
 
                 # forward + backward + optimize
-                # detach previous states from the graph to truncate backprop
-                states = [state.detach() for state in states]
+                if rnn:
+                    # detach previous states from the graph to truncate backprop
+                    states = [state.detach() for state in states]
 
-                outputs, states = model(inputs, states)
+                    outputs, states = model(inputs, states)
+
+                else:
+                    outputs = model(inputs)
 
                 # print(outputs.size(), labels.size())
 
@@ -121,8 +128,9 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
 
                 loss.backward()
 
-                # clip gradients to avoid gradient explosion or vanishing
-                clip_grad_norm_(model.parameters(), 0.5)
+                if rnn:
+                    # clip gradients to avoid gradient explosion or vanishing
+                    clip_grad_norm_(model.parameters(), 0.5)
 
                 # update parameters
                 optimizer.step()
@@ -150,7 +158,7 @@ def train(model, train_loader, val_loader, batch_size, criterion, optimizer, \
                     print('change lr to {}'.format(p['lr']))
 
 
-def validate(model, batch_size, val_loader, topk=(1, 5), cuda=True):
+def validate(model, rnn, batch_size, val_loader, topk=(1, 5), cuda=True):
     device = 'cuda' if cuda else 'cpu'
     # torch.cuda.set_device(0)
     meters = {}
@@ -166,14 +174,18 @@ def validate(model, batch_size, val_loader, topk=(1, 5), cuda=True):
     # print('Validating ', end='', flush=True)
     print('Validating on {} data'.format(num_data))
 
-    # init states
-    h0 = Variable(torch.zeros(1, 1, 1000), requires_grad=False).to(device)
-    c0 = Variable(torch.zeros(1, 1, 1000), requires_grad=False).to(device)
-    states = (h0, c0)
+    if rnn:
+        # init states
+        h0 = Variable(torch.zeros(1, 1, 8), requires_grad=False).to(device)
+        c0 = Variable(torch.zeros(1, 1, 8), requires_grad=False).to(device)
+        states = (h0, c0)
 
     for i, (input, target) in enumerate(val_loader):
-        input = input.squeeze(0).to(device)
-        target = target.squeeze().to(device)
+        input = input.to(device)
+        target = target.to(device)
+        if rnn:
+            input = input.squeeze(0)
+            target = target.squeeze()
 
         input_var = Variable(input)
         target_var = Variable(target)
@@ -181,8 +193,10 @@ def validate(model, batch_size, val_loader, topk=(1, 5), cuda=True):
         # input_var, target_var = input_var.squeeze(0), target_var.squeeze(0)
 
         # print(input_var.size(), target_var.size())
-
-        output, states = model(input_var, states)
+        if rnn:
+            output, states = model(input_var, states)
+        else:
+            output = model(input_var)
 
         # measure accuracy
         result = accuracy(output.data, target, topk)
@@ -227,7 +241,6 @@ def accuracy(output, target, topk=(1,)):
 
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
-    # print(pred, target)
 
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
