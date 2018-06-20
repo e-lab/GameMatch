@@ -14,9 +14,12 @@ import time
 from datetime import timedelta
 
 
-def train(model, rnn, train_loader, val_loader, batch_size, criterion, optimizer, \
+def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criterion, optimizer, \
         target_accr=None, err_margin=(0.01, 0.01), best_accr=(0, 0), topk=(1, 5), lr_decay=0.1, \
         saved_epoch=0, log='train.csv', pname='model.pth', cuda=True):
+
+    # debugging ...
+    # print(rnn)
 
     device = 'cuda' if cuda else 'cpu'
 
@@ -46,7 +49,7 @@ def train(model, rnn, train_loader, val_loader, batch_size, criterion, optimizer
     while True:
         model.eval()
 
-        result = tuple(validate(model, rnn, batch_size, val_loader, topk, cuda))
+        result = tuple(validate(model, rnn, hidden_size, batch_size, val_loader, topk, cuda))
 
         # if the current accuracy is better than the best accuracy
         if len(list(filter(lambda t: t[0] > t[1], zip(best_accr, result)))) == 0:
@@ -63,6 +66,7 @@ def train(model, rnn, train_loader, val_loader, batch_size, criterion, optimizer
         for i, r in enumerate(result):
             if target_accr is None:
                 # if not converge, continue training
+                # uncommented june 20th
                 if r - old_accr[i] > err_margin[i]: break
             elif target_accr[i] - r > err_margin[i]: break
         else: 
@@ -86,8 +90,8 @@ def train(model, rnn, train_loader, val_loader, batch_size, criterion, optimizer
             if rnn:
                 # set init state for lstm
                 # 1 batch, 1 layer
-                h0 = Variable(torch.zeros(1, 1, 8)).to(device)
-                c0 = Variable(torch.zeros(1, 1, 8)).to(device)
+                h0 = Variable(torch.zeros(1, 1, hidden_size)).to(device)
+                c0 = Variable(torch.zeros(1, 1, hidden_size)).to(device)
                 states = (h0, c0)
 
             for i, data in enumerate(train_loader, 0):
@@ -158,9 +162,8 @@ def train(model, rnn, train_loader, val_loader, batch_size, criterion, optimizer
                     print('change lr to {}'.format(p['lr']))
 
 
-def validate(model, rnn, batch_size, val_loader, topk=(1, 5), cuda=True):
+def validate(model, rnn, hidden_size, batch_size, val_loader, topk=(1, 5), cuda=True):
     device = 'cuda' if cuda else 'cpu'
-    # torch.cuda.set_device(0)
     meters = {}
     for i in topk:
         meters[i] = AverageMeter()
@@ -171,13 +174,12 @@ def validate(model, rnn, batch_size, val_loader, topk=(1, 5), cuda=True):
     start = time.time()
 
     num_data = len(val_loader) * batch_size
-    # print('Validating ', end='', flush=True)
     print('Validating on {} data'.format(num_data))
 
     if rnn:
         # init states
-        h0 = Variable(torch.zeros(1, 1, 8), requires_grad=False).to(device)
-        c0 = Variable(torch.zeros(1, 1, 8), requires_grad=False).to(device)
+        h0 = Variable(torch.zeros(1, 1, hidden_size), requires_grad=False).to(device)
+        c0 = Variable(torch.zeros(1, 1, hidden_size), requires_grad=False).to(device)
         states = (h0, c0)
 
     for i, (input, target) in enumerate(val_loader):
@@ -192,7 +194,9 @@ def validate(model, rnn, batch_size, val_loader, topk=(1, 5), cuda=True):
 
         # input_var, target_var = input_var.squeeze(0), target_var.squeeze(0)
 
+        # debugging ...
         # print(input_var.size(), target_var.size())
+
         if rnn:
             output, states = model(input_var, states)
         else:
@@ -241,6 +245,9 @@ def accuracy(output, target, topk=(1,)):
 
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
+
+    # debugging ...
+    # print(pred, target)
 
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
