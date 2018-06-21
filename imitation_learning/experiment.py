@@ -1,6 +1,4 @@
-import sys, os
-sys.path.append(os.getcwd())
-
+import os
 import argparse
 from collections import OrderedDict
 
@@ -8,11 +6,11 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torchvision import transforms
-from generic_training import train, validate
+from utils.generic_training import train, validate
 
-from alexnet_lstm import AFC, ALSTM, ALSTM1
+from models.alexnet_lstm import AFC, ALSTM, ALSTM1
 
-from imutils import gen_loaders
+from utils.imutils import gen_loaders
 
 
 configs = {'AFC': \
@@ -34,14 +32,23 @@ configs = {'AFC': \
         'name':'bn_lstm'}
         }
 
-
+'''
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', type=str)
+    parser.add_argument('-d', '--device', type=str, default='0')
 
     args = parser.parse_args()
 
     name = args.model
+    print('model name:', name)
+
+    device_id = args.device
+'''
+
+def exp(name, device_id=0):
+    # set the visible gpu
+    os.environ['CUDA_VISIBLE_DEVICES'] = device_id
 
     config = configs[name]
 
@@ -49,9 +56,9 @@ def main():
     
     device = 'cuda'
 
-    BATCH_SIZE = 128 if name == 'AFC' else 1
+    BATCH_SIZE = 16 if name == 'AFC' else 1
 
-    datapath = 'data_HGS/'
+    datapath = 'data_1roomf/'
     train_loader, test_loader = gen_loaders(datapath, config['rec'], BATCH_SIZE, 4)
 
 
@@ -77,19 +84,20 @@ def main():
     train_args['batch_size'] = BATCH_SIZE
     train_args['criterion'] = criterion
     train_args['optimizer'] = optimizer
-    train_args['target_accr'] = (100,)
-    train_args['err_margin'] = (1.,)
+    train_args['target_accr'] = None    # (100,) 
+    train_args['err_margin'] = (0.005,)
     train_args['best_acc'] = (0,)
     train_args['topk'] = (1,)
     train_args['lr_decay'] = 0.8
     train_args['saved_epoch'] = 0
-    train_args['log'] = 'hgs_'+config['name']+'.csv'
-    train_args['pname'] = 'hgs_'+config['name']+'.pth'
+    train_args['log'] = '1room_'+config['name']+'.csv'
+    train_args['pname'] = '1room_'+config['name']+'.pth'
     train_args['cuda'] = True
 
     train(*train_args.values())
 
-
+'''
 if __name__ == '__main__':
+    print('running main')
     main()
-
+'''

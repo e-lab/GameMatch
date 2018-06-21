@@ -38,6 +38,9 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
     # interval of evaluating performance
     epoch = 5
 
+    # record how many times the accuracy has remained the same
+    accr_count = 0
+
     # total number of data points in the dataset
     num_data = len(train_loader) * batch_size
 
@@ -67,12 +70,15 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
             if target_accr is None:
                 # if not converge, continue training
                 # uncommented june 20th
-                if r - old_accr[i] > err_margin[i]: break
-            elif target_accr[i] - r > err_margin[i]: break
-        else: 
-            with open(log, 'a') as f:
-                f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
-            break
+                if r < 0.1 or abs(r - old_accr[i]) > err_margin[i]: break
+            elif abs(target_accr[i] - r) > err_margin[i]: break
+        else:
+            if accr_count >= 5:
+                with open(log, 'a') as f:
+                    f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+                break
+            else:
+                accr_count += 1
 
         # update the old accuracy to current accuracy
         if target_accr is None:
@@ -141,7 +147,7 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
 
                 if i % 20 == 0:
                     print("Progress {:2.1%}".format(i * batch_size / num_data), end="\r")
-                    print(loss)
+                    # print(loss)
                     grad = torch.cat([p.grad.view(1,-1).squeeze().cpu() for p in model.parameters()])
                     # print(torch.histc(gradients, bins=10, max=0.01, min=-0.01))
                     print('max: %.5f\tmin: %.5f\tmean: %.7f\tmedian: %.2f' % (grad.max(), grad.min(), \

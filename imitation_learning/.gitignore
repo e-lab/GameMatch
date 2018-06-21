@@ -1,3 +1,6 @@
 __pycache__
 health-gathering
 hg_data
+data_*
+
+*.pth
