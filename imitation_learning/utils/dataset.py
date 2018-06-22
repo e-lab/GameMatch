@@ -38,6 +38,16 @@ class DataFromJSON(Dataset):
         return (img_tensor, action, reward)
         '''
         hot = int(sum([action[i]*(2**i) for i in range(len(action))]))
+        
+        '''
+        wrong, could have combinations
+        # june 21: use common encoding of the result
+        # there are six available actions to take
+        hot = 0
+        for i, a in enumerate(action, 1):
+            if abs(a - 0) > 1e-4:
+                hot = i
+        '''
 
         # ret_act = torch.FloatTensor([0 if x != hot else 1 for x in range(8)])
 
@@ -49,7 +59,7 @@ class DataFromJSON(Dataset):
 
 
 class SeqDataFromJSON(Dataset):
-    def __init__(self, data_path=None, data_list=None, seq_len=16, transforms=None):
+    def __init__(self, data_path=None, data_list=None, seq_len=8, transforms=None):
         self.data_path = data_path
         self.data_list = data_list
 
@@ -84,6 +94,14 @@ class SeqDataFromJSON(Dataset):
             # action should be a list of numbers
             action = item['action']
             hot = int(sum([action[i]*(2**i) for i in range(len(action))]))
+            '''
+            # june 21: use common encoding of the result
+            # there are six available actions to take
+            hot = 0
+            for i, a in enumerate(action, 1):
+                if abs(a - 0) > 1e-4:
+                    hot = i
+            '''
 
             actions.append(hot)
 

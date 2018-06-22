@@ -70,8 +70,12 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
             if target_accr is None:
                 # if not converge, continue training
                 # uncommented june 20th
-                if r < 0.1 or abs(r - old_accr[i]) > err_margin[i]: break
-            elif abs(target_accr[i] - r) > err_margin[i]: break
+                if r < 0.1 or abs(r - old_accr[i]) > err_margin[i]:
+                    accr_count = 0
+                    break
+            elif abs(target_accr[i] - r) > err_margin[i]:
+                accr_count = 0
+                break
         else:
             if accr_count >= 5:
                 with open(log, 'a') as f:
@@ -105,7 +109,9 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
 
                 inputs, labels = data
                 # labels = torch.stack(labels)
+                # for debugging
                 # print(inputs.size(), labels.size())
+                # print(labels)
 
                 if rnn:
                     inputs, labels = inputs.squeeze(0), labels.squeeze()
@@ -128,6 +134,7 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
                 else:
                     outputs = model(inputs)
 
+                # for debugging
                 # print(outputs.size(), labels.size())
 
                 loss = criterion(outputs, labels)

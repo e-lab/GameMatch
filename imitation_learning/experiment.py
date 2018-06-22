@@ -8,7 +8,7 @@ from torch.autograd import Variable
 from torchvision import transforms
 from utils.generic_training import train, validate
 
-from models.alexnet_lstm import AFC, ALSTM, ALSTM1
+from models.models_1room import AFC, ALSTM, ALSTM1
 
 from utils.imutils import gen_loaders
 
@@ -28,23 +28,10 @@ configs = {'AFC': \
         {'model':ALSTM1, \
         'GPU':'cuda:2', \
         'rec':True, \
-        'hs': 8, \
+        'hs': 32, \
         'name':'bn_lstm'}
         }
 
-'''
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', type=str)
-    parser.add_argument('-d', '--device', type=str, default='0')
-
-    args = parser.parse_args()
-
-    name = args.model
-    print('model name:', name)
-
-    device_id = args.device
-'''
 
 def exp(name, device_id=0):
     # set the visible gpu
@@ -56,9 +43,9 @@ def exp(name, device_id=0):
     
     device = 'cuda'
 
-    BATCH_SIZE = 16 if name == 'AFC' else 1
+    BATCH_SIZE = 8 if name == 'AFC' else 1
 
-    datapath = 'data_1roomf/'
+    datapath = 'data_1roomb/'
     train_loader, test_loader = gen_loaders(datapath, config['rec'], BATCH_SIZE, 4)
 
 
@@ -90,14 +77,21 @@ def exp(name, device_id=0):
     train_args['topk'] = (1,)
     train_args['lr_decay'] = 0.8
     train_args['saved_epoch'] = 0
-    train_args['log'] = '1room_'+config['name']+'.csv'
-    train_args['pname'] = '1room_'+config['name']+'.pth'
+    train_args['log'] = '1roomb_'+config['name']+'.csv'
+    train_args['pname'] = '1roomb_'+config['name']+'.pth'
     train_args['cuda'] = True
 
     train(*train_args.values())
 
-'''
 if __name__ == '__main__':
-    print('running main')
-    main()
-'''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--model', type=str)
+    parser.add_argument('-d', '--device', type=str, default='0')
+
+    args = parser.parse_args()
+
+    name = args.model
+
+    device_id = args.device
+
+    exp(name, device_id)

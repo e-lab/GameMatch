@@ -1,0 +1,12 @@
+Jun/21/2018 13:51:28
+epoches, top1
+0,tensor(0., device='cuda:0')
+5,tensor(0., device='cuda:0')
+10,tensor(52.4590, device='cuda:0')
+15,tensor(52.4590, device='cuda:0')
+20,tensor(52.4590, device='cuda:0')
+25,tensor(52.4590, device='cuda:0')
+30,tensor(52.4590, device='cuda:0')
+35,tensor(52.4590, device='cuda:0')
+40,tensor(52.4590, device='cuda:0')
+Jun/21/2018 14:02:14
