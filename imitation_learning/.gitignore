@@ -4,3 +4,6 @@ hg_data
 data_*
 
 *.pth
+*room*
+main.c
+Makefile
