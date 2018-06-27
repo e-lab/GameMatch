@@ -99,16 +99,20 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
 
             if rnn:
                 # set init state for lstm
-                # 1 batch, 1 layer
-                h0 = Variable(torch.zeros(1, 1, hidden_size)).to(device)
-                c0 = Variable(torch.zeros(1, 1, hidden_size)).to(device)
+                # Now we have multiple hidden layers
+                states = []
+                for hs in hidden_size:
+                    # 1 batch, 1 layer
+                    h0 = Variable(torch.zeros(1, 1, hs)).to(device)
+                    c0 = Variable(torch.zeros(1, 1, hs)).to(device)
+                    states.append((h0, c0))
                 '''
                 h0 = Variable(torch.zeros(8, hidden_size)).to(device)
                 c0 = Variable(torch.zeros(8, hidden_size)).to(device)
                 '''
                 # modified
 
-                states = (h0, c0)
+                # states = (h0, c0)
 
             for i, data in enumerate(train_loader, 0):
                 index = 0
@@ -133,7 +137,7 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
                 # forward + backward + optimize
                 if rnn:
                     # detach previous states from the graph to truncate backprop
-                    states = [state.detach() for state in states]
+                    states = [[s.detach() for s in state] for state in states]
 
                     outputs, states = model(inputs, states)
 
@@ -203,14 +207,19 @@ def validate(model, rnn, hidden_size, batch_size, val_loader, topk=(1, 5), cuda=
 
     if rnn:
         # init states
-        h0 = Variable(torch.zeros(1, 1, hidden_size), requires_grad=False).to(device)
-        c0 = Variable(torch.zeros(1, 1, hidden_size), requires_grad=False).to(device)
+        # Now we have multiple hidden layers
+        states = []
+        for hs in hidden_size:
+            # 1 batch, 1 layer
+            h0 = Variable(torch.zeros(1, 1, hs)).to(device)
+            c0 = Variable(torch.zeros(1, 1, hs)).to(device)
+            states.append((h0, c0))
         '''
         h0 = Variable(torch.zeros(8, hidden_size), requires_grad=False).to(device)
         c0 = Variable(torch.zeros(8, hidden_size), requires_grad=False).to(device)
         '''
         # modified
-        states = (h0, c0)
+        # states = (h0, c0)
 
     for i, (input, target) in enumerate(val_loader):
         input = input.to(device)

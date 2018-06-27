@@ -59,7 +59,7 @@ class DataFromJSON(Dataset):
 
 
 class SeqDataFromJSON(Dataset):
-    def __init__(self, data_path=None, data_list=None, seq_len=8, transforms=None):
+    def __init__(self, data_path=None, data_list=None, seq_len=32, transforms=None):
         self.data_path = data_path
         self.data_list = data_list
 

@@ -2,6 +2,7 @@ from torchvision.models import alexnet
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 # add fully-connected layer w/ BatchNorm
@@ -9,7 +10,9 @@ class AFC(nn.Module):
     def __init__(self):
         super(AFC, self).__init__()
 
-        self.features = alexnet().features
+        self.features = alexnet(pretrained=True).features
+        self.conv6 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3)
+        self.maxpool = nn.MaxPool2d(kernel_size=2, cell_mode=False)
 
         self.classifier = alexnet().classifier
         self.bn = nn.BatchNorm1d(1000)
@@ -21,7 +24,11 @@ class AFC(nn.Module):
     def forward(self, x):
         x = self.features(x)
 
-        x = x.view(x.size(0), 256 * 6 * 6)
+        # x = x.view(x.size(0), 256 * 6 * 6)
+        x = self.conv6(x)
+        F.relu(x, inplace=True)
+        x = self.maxpool(x)
+        x = x.view(x.size(512 * 4))
 
         x = self.classifier(x)
 
