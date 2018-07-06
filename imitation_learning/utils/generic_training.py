@@ -29,8 +29,9 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
 
     # log activity in the log file
     with open(log, 'a') as f:
-        f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
-        f.write('epoches, ' + ','.join(['top{}'.format(i) for i in topk]) + '\n')
+        # f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+        # f.write('epoches, ' + ','.join(['top{}'.format(i) for i in topk]) + '\n')
+        f.write('******\n')
     
     # resume epoch
     num_epoch = saved_epoch 
@@ -78,11 +79,17 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
                 break
         else:
             if accr_count >= 5:
-                with open(log, 'a') as f:
-                    f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+                # with open(log, 'a') as f:
+                    # f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
                 break
             else:
                 accr_count += 1
+
+        # added jun 27th
+        # if > 150 epochs, exit
+
+        if num_epoch >= 100:
+            break
 
         # update the old accuracy to current accuracy
         if target_accr is None:

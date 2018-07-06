@@ -12,7 +12,7 @@ from torch.autograd import Variable
 from torchvision import transforms
 
 
-def gen_loaders(path, recurrent, BATCH_SIZE, NUM_WORKERS):
+def gen_loaders(path, recurrent, seq_len, BATCH_SIZE, NUM_WORKERS):
     Gen = SDJ if recurrent else DJ
     # Data loading code
     # traindir = os.path.join(path, 'train')
@@ -42,14 +42,20 @@ def gen_loaders(path, recurrent, BATCH_SIZE, NUM_WORKERS):
             normalize
     ])
 
-    train_set = Gen(data_path=path, data_list=train_data, transforms=transformations)
+    if recurrent:
+        train_set = Gen(data_path=path, data_list=train_data, seq_len=seq_len, transforms=transformations)
+    else:
+        train_set = Gen(data_path=path, data_list=train_data, transforms=transformations)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, \
                                                     batch_size=BATCH_SIZE,
                                                     shuffle=True,
                                                     num_workers=NUM_WORKERS, 
                                                     pin_memory=True)
 
-    test_set =  Gen(data_path=path, data_list=test_data, transforms=transformations)
+    if recurrent:
+        test_set =  Gen(data_path=path, data_list=test_data, seq_len=seq_len, transforms=transformations)
+    else:
+        test_set =  Gen(data_path=path, data_list=test_data, transforms=transformations)
     test_loader = torch.utils.data.DataLoader(dataset=test_set, \
                                                     batch_size=BATCH_SIZE,
                                                     shuffle=True,

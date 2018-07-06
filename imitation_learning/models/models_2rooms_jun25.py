@@ -15,14 +15,14 @@ class ALSTM2rooms(nn.Module):
 
         self.features = alexnet(pretrained=True).features
 
-        self.conv6 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3)
+        self.conv6 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, bias=True)
         self.maxpool = nn.MaxPool2d(kernel_size=2, ceil_mode=False)
 
         # self.lstm = nn.LSTM(input_size=9216, hidden_size=512, batch_first=True)
         self.lstm1 = nn.LSTM(input_size=2048, hidden_size=1024, batch_first=True)
         self.lstm2 = nn.LSTM(input_size=1024, hidden_size=512, batch_first=True)
 
-        self.classifier = nn.Sequential(nn.Linear(in_features=512, out_features=128), \
+        self.classifier = nn.Sequential(nn.Linear(in_features=512, out_features=128, bias=True), \
                 nn.Linear(in_features=128, out_features=32, bias=True), nn.Softmax())
 
 

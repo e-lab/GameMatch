@@ -29,8 +29,9 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
 
     # log activity in the log file
     with open(log, 'a') as f:
-        f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
-        f.write('epoches, ' + ','.join(['top{}'.format(i) for i in topk]) + '\n')
+        # f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+        # f.write('epoches, ' + ','.join(['top{}'.format(i) for i in topk]) + '\n')
+        f.write('******\n')
     
     # resume epoch
     num_epoch = saved_epoch 
@@ -60,7 +61,16 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
             'params':model.state_dict(), \
             'optim':optimizer.state_dict(), \
             'epoch':num_epoch}, pname)
+        '''
+        # modified on June 26th
+        # every 5 epoches, save the model to see its progress
+        new_name = pname.split('.')
+        new_name[-2] += '_' + str(num_epoch)
 
+        torch.save({
+        'params':model.state_dict(), \
+        'epoch':num_epoch}, '.'.join(new_name))
+        '''
         
         with open(log, 'a') as f:
             f.write(str(num_epoch) + \
@@ -78,11 +88,19 @@ def train(model, rnn, hidden_size, train_loader, val_loader, batch_size, criteri
                 break
         else:
             if accr_count >= 5:
-                with open(log, 'a') as f:
-                    f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+                # with open(log, 'a') as f:
+                    # f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+                    # f.write('******\n')
                 break
             else:
                 accr_count += 1
+
+        # if the number of epochs exceed 150, exit
+        if num_epoch >= 150:
+            # with open(log, 'a') as f:
+                # f.write(time.strftime('%b/%d/%Y %H:%M:%S', time.localtime()) + '\n')
+                # f.write('******\n')
+            break
 
         # update the old accuracy to current accuracy
         if target_accr is None:
