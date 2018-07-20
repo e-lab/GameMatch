@@ -3,12 +3,22 @@
 #
 # Created by Andrey Kolishchak on 01/21/17.
 #
+# Modified by Ruihang Du (du113@purdue.edu)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.lstm import LSTM
 import random
 
+
+# model: AAC Conv Base + LSTM in middle
+# feature extractor:
+# # channels: 3->16->32->64->128->256->512
+# LSTM:
+# 1 layer
+# features: 2048 -> 512
+# fully-connected: 512->128->32
 
 class BaseModelLSTM(nn.Module):
     def __init__(self):

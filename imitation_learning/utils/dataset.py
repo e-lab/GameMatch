@@ -1,3 +1,8 @@
+# utils.dataset
+# Customize dataloaders used in training and testing
+# Author: Ruihang Du
+# email: du113@purdue.edu
+
 import torch
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -5,16 +10,21 @@ import json
 
 from PIL import Image
 
+# prepare dataset from the json file
 class DataFromJSON(Dataset):
     def __init__(self, data_path=None, data_list=None, transforms=None):
         self.data_path = data_path
         self.data_list = data_list
 
         if data_path and not data_list:
+            # if we don't already have a list of tensor data, we load them
+            # the name of stored frames and other important information 
+            # will be read in from the json file
             with open(data_path + 'data.json', 'r') as datafile:
                 # loads will create a list of dictionaries
                 self.data = json.loads(json.load(datafile))
         if data_list:
+            # otherwise, just use the preexisting data list
             self.data = data_list
 
         self.transforms = transforms
@@ -30,13 +40,8 @@ class DataFromJSON(Dataset):
 
         # action should be a list of numbers
         action = item['action']
-        '''
-        # the reward should be a single number
-        reward = item['reward']
-        
-        # return state
-        return (img_tensor, action, reward)
-        '''
+
+        # this encodes the action from a 'binary string' to an integer
         hot = int(sum([action[i]*(2**i) for i in range(len(action))]))
         
         '''
@@ -58,6 +63,8 @@ class DataFromJSON(Dataset):
         return len(self.data)
 
 
+# prepare a dataset containing sequence of data points
+# used for networks with LSTM
 class SeqDataFromJSON(Dataset):
     def __init__(self, data_path=None, data_list=None, seq_len=32, transforms=None):
         self.data_path = data_path
@@ -113,28 +120,3 @@ class SeqDataFromJSON(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-'''
-if __name__ == '__main__':
-    # define transformation
-    transformations = transforms.Compose([transforms.ToTensor()])
-
-    # create dataset instance
-    custom_data = DataFromJSON(data_path='data/', transforms=transformations)
-
-    # use the dataloader as you would with other datasets
-    dataloader = torch.utils.data.DataLoader(dataset=custom_data, \
-                                                    batch_size=1,shuffle=False)
-
-    for i, data in enumerate(dataloader):
-        if i > 0: break
-        img, action = data
-        # since the original action is a list of torch double tensors, turn it to a tensor
-        # action = torch.stack(action).float().squeeze()
-        # cast reward to integer tensor
-        # reward = reward.int()
-
-        print('img', type(img))
-        print('action', action)
-        print('reward', reward)
-'''

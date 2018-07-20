@@ -1,3 +1,7 @@
+# A script that organizes experiments
+# Author: Ruihang Du
+# email: du113@purdue.edu
+
 import os
 import argparse
 from collections import OrderedDict
@@ -7,11 +11,8 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torchvision import transforms
 from utils.generic_training import train, validate
-# from utils.generic_training_multi_lstm import train, validate
-
-# from models.models_1room import AFC, ALSTM, ALSTM1
 from models.basic_models import AFC, ALSTM
-from models.models_2rooms_jun25 import ALSTM2rooms
+from models.models_2rooms import ALSTM2rooms
 from models.aac_lstm import BaseModelLSTM
 from models.aac import BaseModel
 
@@ -19,7 +20,7 @@ from utils.imutils import gen_loaders
 
 import random
 
-
+# configurations of possible network structures
 configs = {'AFC': \
         {'model':AFC, \
         'GPU':'cuda:0', \
@@ -34,7 +35,7 @@ configs = {'AFC': \
         {'model':ALSTM, \
         'GPU':'cuda:1', \
         'rec':True, \
-        'hs': 1000, \
+        'hs': 4096, \
         'name':'bn_lstm_fc'}, \
         'ALSTM2rooms': \
         {'model':ALSTM2rooms, \
@@ -51,6 +52,7 @@ configs = {'AFC': \
         }
 
 
+# function that runs experiments
 def exp(name, device_id=0):
     # set the visible gpu
     os.environ['CUDA_VISIBLE_DEVICES'] = device_id
@@ -61,8 +63,11 @@ def exp(name, device_id=0):
     
     device = 'cuda'
 
+    # if the network has LSTM layers, then use batchsize = 1
+    # otherwise if it's just a CNN, then use batchsize = 32
     BATCH_SIZE = 32 if name == 'AFC' or name == 'Conv' else 1
 
+    # define the path to dataset
     datapath = 'data_2room/'
     train_loader, test_loader = gen_loaders(datapath, config['rec'], BATCH_SIZE, 4)
 
@@ -76,6 +81,7 @@ def exp(name, device_id=0):
 
     criterion = nn.CrossEntropyLoss().to(device)
     
+    # configure the arguments to the training function
     train_args = OrderedDict()
 
     train_args['model'] = net
@@ -106,6 +112,7 @@ def exp(name, device_id=0):
     train(*train_args.values())
 
 
+# reinitialize the network
 def reinit(m):
     if type(m) == nn.Conv2d:
         m.weight.data.normal_(0.0, 0.02)
@@ -124,8 +131,6 @@ def exp2(name, seq_len, device_id='0'):
 
     config = configs[name]
 
-    net = config['model']()
-    
     device = 'cuda'
 
     BATCH_SIZE = seq_len if name == 'AFC' or name == 'Conv' else 1
@@ -138,7 +143,6 @@ def exp2(name, seq_len, device_id='0'):
     epoch = 0
     criterion = nn.CrossEntropyLoss().to(device)
 
-    net = net.to(device)
     train_args = OrderedDict()
 
 
@@ -146,7 +150,15 @@ def exp2(name, seq_len, device_id='0'):
         print('running experiment', i)
         torch.cuda.manual_seed(0)
 
+        net = config['model']()
+    
+        # don't reinitialize the network like this
+        # we want to use the pretrained one
+        '''
         net.apply(reinit)
+        '''
+        net = net.to(device)
+
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
         
         train_args['model'] = net
@@ -166,11 +178,11 @@ def exp2(name, seq_len, device_id='0'):
         train_args['topk'] = (1,)
         train_args['lr_decay'] = 0.8
         train_args['saved_epoch'] = 0
-        train_args['log'] = '../../stats/2rooms/2room_'+config['name']+'_jun28_seq' + str(seq_len) + '.csv'
-        train_args['pname'] = '../../models/2rooms/2room_'+config['name']+'_jun28_seq' + str(seq_len) + '.pth'
+        train_args['log'] = '../../stats/2rooms/2room_'+config['name']+'_july19_seq' + str(seq_len) + '.csv'
+        train_args['pname'] = '../../models/2rooms/2room_'+config['name']+'_july19_seq' + str(seq_len) + '.pth'
         train_args['cuda'] = True
 
-        print(train_args)
+        # print(train_args)
 
         train(*train_args.values())
 

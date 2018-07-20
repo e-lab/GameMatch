@@ -32,7 +32,7 @@ AlexNet feature extractor
 
 ### Fully-connected layers:
 
-AlexNet FC (1000 outputs) -> BatchNorm (size: 1000) -> 32 -> softmax
+BatchNorm (size: 4096) -> 2048 -> 512 -> 32 -> softmax
 
 ## Model 2 (ALSTM):
 
@@ -46,13 +46,13 @@ size: 4096
 
 ### LSTM:
 
-1 layer, 4096 input features, 1000 hidden units
+1 layer, 4096 input features, 512 hidden units
 
 ### Fully-connected layers:
 
-1000 -> 32 -> softmax
+512 -> 32 -> softmax
 
-# models_2rooms_jun25.py
+# models_2rooms.py
 
 ## ALSTM2rooms
 

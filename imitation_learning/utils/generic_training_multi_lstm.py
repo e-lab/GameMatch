@@ -1,7 +1,7 @@
 '''
 Author: Ruihang Du
 Description:
-Functions for training and evaluating any neural network models
+Functions for training and evaluating neural network models with multiple recurrent layers
 Inspired by the PyTorch ImageNet example https://github.com/pytorch/examples/blob/master/imagenet/main.py
 '''
 

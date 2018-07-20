@@ -2,8 +2,11 @@ __pycache__
 health-gathering
 hg_data
 data_*
+plots
 
 *.pth
 *room*
 main.c
 Makefile
+*.txt
+try.py

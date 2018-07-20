@@ -1,3 +1,8 @@
+# This implements a Neural Network that uses the pretrained AlexNet's feature extractor
+# to compare the similarity of 2 frames
+# Author: Ruihang Du
+# email: du113@purdue.edu
+
 import torch
 import torch.nn as nn
 
@@ -7,9 +12,14 @@ from glob import glob
 class Detector:
     def __init__(self):
         self.features = models.alexnet(pretrained=True).features
+        # store the vector representing the last frame
         self.last = None
+
+        # select your distance function
         # self.distfunc = nn.PairwiseDistance(p=2)
         self.distfunc = nn.CosineSimilarity()
+
+        # hyperparameter: threshold of difference
         self.threshold = 1.0
         
     def forward(self, x):
@@ -17,23 +27,29 @@ class Detector:
 
         x = x.view(x.size(0), 256*6*6)
 
-        print(self.last)
+        # debugging
+        # print(self.last)
 
         if self.last is None:
+            # store the current frame as last
             self.last = x.clone()
             return x
 
         distance = self.distfunc(x, self.last)
-        print(distance)
+
+        # debugging
+        # print(distance)
 
         self.last = x.clone()
 
         if distance > self.threshold:
+            # the difference is significant
             return x
         else:
             return None
 
 
+# testing function
 def test():
     from PIL import Image as img
     from torch.autograd import Variable

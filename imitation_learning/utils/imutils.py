@@ -1,5 +1,7 @@
-# import sys, os
-# sys.path.append(os.getcwd())
+# code that creates dataloaders for training and testing
+# Author: Ruihang Du
+# email: du113@purdue.edu
+
 import json
 from random import sample
 from utils.dataset import DataFromJSON as DJ 
@@ -12,11 +14,11 @@ from torch.autograd import Variable
 from torchvision import transforms
 
 
+# generate the loaders for training and test data for simple networks
 def gen_loaders(path, recurrent, seq_len, BATCH_SIZE, NUM_WORKERS):
+    # whether the model has an recurrent layer
     Gen = SDJ if recurrent else DJ
     # Data loading code
-    # traindir = os.path.join(path, 'train')
-    # valdir = os.path.join(path, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -36,7 +38,8 @@ def gen_loaders(path, recurrent, seq_len, BATCH_SIZE, NUM_WORKERS):
 
     # define transformation
     transformations = transforms.Compose([
-            transforms.Resize(256),  # transforms.Scale(256),
+            transforms.Scale(256),
+            # transforms.Resize(256),  
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize
