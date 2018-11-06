@@ -240,7 +240,7 @@ for i_episode in range(num_episodes):
         # Perform one step of the optimization (on the target network)
         lossi = optimize_model()
         if lossi is not None:
-            losst = losst + lossi[0].item()
+            losst = losst + lossi.item()
         if done:
             episode_durations.append(t + 1)
             # plot_durations()
