@@ -1,6 +1,8 @@
 # E. Culurciello
-# Novemeber 2018
+# November 2018
 # experiments with predictive networks in RL
+#
+# inspired by: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 import gym
 import math
