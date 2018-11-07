@@ -7,6 +7,7 @@
 import gym
 import math
 import random
+import numpy as np
 from itertools import count
 from PIL import Image
 import matplotlib
@@ -24,6 +25,11 @@ game = 'Breakout-v0'
 env = gym.make(game)
 print(colored('\nPlaying game:', 'green'), game)
 print(colored('available actions:', 'red'), env.unwrapped.get_action_meanings(), '\n')
+numactions = len(env.unwrapped.get_action_meanings())
+
+# set up a tensor 1-hot for the action 0 = NOOP:
+no_op_action = torch.zeros(numactions, dtype=torch.float)
+no_op_action[0] = 1.
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -39,7 +45,7 @@ BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 200
+EPS_DECAY = 1000
 TARGET_UPDATE = 10
 steps_done = 0
 num_episodes = 50
@@ -85,10 +91,11 @@ class CNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(32)
         # self.conv4 = nn.Conv2d(32, 32, kernel_size=3, stride=2)
         # self.bn4 = nn.BatchNorm2d(32)
-        self.pred = nn.Linear(32*5*3, 32*5*3) # this predicts next representation
-        self.policy = nn.Linear(32*5*3, 4) # this generates action
+        self.predp = nn.Linear(32*5*3, 32*5*3) # this predicts next representation from prev representation
+        self.preda = nn.Linear(numactions, 32*5*3) # this predicts next representation from prev action
+        self.policy = nn.Linear(32*5*3, numactions) # this generates action
 
-    def forward(self, x):
+    def forward(self, x, a): # inputs are: x = frame, a = action
         x = self.maxp(x)
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
@@ -97,9 +104,14 @@ class CNN(nn.Module):
         representation = x # output representation of network
         # print(x.size())
         policy = self.policy(x.view(x.size(0), -1))
-        pred = self.pred(x.view(x.size(0), -1))
+        pred = self.predp(x.view(x.size(0), -1)) + self.preda(a)
         return policy, pred, representation
 
+
+def one_hot_convert(x): # convert action vector to 1-hot vector
+    converted = torch.zeros([x.size(0), numactions], dtype=torch.float)
+    converted[np.arange(BATCH_SIZE), x.squeeze(1)] = 1.
+    return converted
 
 
 def optimize_model():
@@ -117,13 +129,16 @@ def optimize_model():
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
+    # print(action_batch[0:4])
+    action_batch_tensors = one_hot_convert(action_batch)
+    # print(action_batch_tensors[0:4])
     representation_batch = torch.cat(batch.representation)
     reward_batch = torch.cat(batch.reward)
 
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken
-    policies, preds, _ = policy_net(state_batch)
+    policies, preds, _ = policy_net(state_batch, action_batch_tensors)
     # state_action_values = policies.gather(1, action_batch)
 
     # # Q-learning not used here - EC!
@@ -149,15 +164,11 @@ def optimize_model():
     return outputf
 
 
-def select_action(state):
-    global steps_done
+def select_action(state, threshold):
     sample = random.random()
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1. * steps_done / EPS_DECAY)
-    steps_done += 1
     with torch.no_grad():
-            policy, pred,representation  = policy_net(state)
-    if sample > eps_threshold:
+            policy, pred,representation  = policy_net(state, no_op_action)
+    if sample > threshold:
             return policy.max(1)[1].view(1, 1), representation
     else:
         return torch.tensor([[random.randrange(2)]], device=device, dtype=torch.long), representation
@@ -199,6 +210,8 @@ target_net.eval()
 loss = nn.MSELoss()
 optimizer = optim.RMSprop(policy_net.parameters())
 
+steps_done = 0
+
 for i_episode in range(num_episodes):
     # Initialize the environment and state
     env.reset()
@@ -218,7 +231,10 @@ for i_episode in range(num_episodes):
         # action = env.action_space.sample() # random action
         # print(action)
         # observation, reward, done, info = env.step(action)
-        action, representation = select_action(state)
+        eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+            math.exp(-1. * steps_done / EPS_DECAY)
+        steps_done += 1
+        action, representation = select_action(state, eps_threshold)
         # print(action.item())
         _, reward, done, _ = env.step(action.item())
         reward = torch.tensor([reward], device=device)
@@ -244,7 +260,7 @@ for i_episode in range(num_episodes):
         if done:
             episode_durations.append(t + 1)
             # plot_durations()
-            print('Loss in this episode:', losst)
+            print('Steps:', steps_done, 'eps_threshold:', eps_threshold, 'Loss in this episode:', losst)
             losst = 0
             break
     # Update the target network
