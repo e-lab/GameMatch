@@ -27,10 +27,6 @@ print(colored('\nPlaying game:', 'green'), game)
 print(colored('available actions:', 'red'), env.unwrapped.get_action_meanings(), '\n')
 numactions = len(env.unwrapped.get_action_meanings())
 
-# set up a tensor 1-hot for the action 0 = NOOP:
-no_op_action = torch.zeros(numactions, dtype=torch.float)
-no_op_action[0] = 1.
-
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -41,20 +37,26 @@ plt.ion()
 # if gpu is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-BATCH_SIZE = 128
-GAMMA = 0.999
+np.set_printoptions(precision=3)
+# set up a tensor 1-hot for the action 0 = NOOP:
+no_op_action = torch.zeros(numactions, device=device, dtype=torch.float)
+no_op_action[0] = 1.
+
+
+BATCH_SIZE = 256
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 1000
+EPS_DECAY = 10000
 TARGET_UPDATE = 10
+MEM_SIZE = 10000
 steps_done = 0
-num_episodes = 50
+num_episodes = 200
 episode_durations = []
-prepscreen = T.Compose([#T.ToPILImage(),
-                    #T.Resize(40, interpolation=Image.CUBIC),
-                    T.ToTensor()])
+saved_model_filename = 'saved_model.pth'
+
+prepscreen = T.Compose([T.ToTensor()])
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'representation', 'next_state', 'reward'))
+        ('state', 'action', 'representation', 'next_state', 'reward'))
 
 
 class ReplayMemory(object):
@@ -124,34 +126,17 @@ def optimize_model():
 
     # Compute a mask of non-final states and concatenate the batch elements
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                          batch.next_state)), device=device, dtype=torch.uint8)
+                                          batch.next_state)), dtype=torch.uint8)
     non_final_next_states = torch.cat([s for s in batch.next_state
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
-    # print(action_batch[0:4])
-    action_batch_tensors = one_hot_convert(action_batch)
-    # print(action_batch_tensors[0:4])
+    action_batch_tensors = one_hot_convert(action_batch).to(device)
     representation_batch = torch.cat(batch.representation)
-    reward_batch = torch.cat(batch.reward)
+    # reward_batch = torch.cat(batch.reward)
 
-
-    # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-    # columns of actions taken
+    # compute predictions and prediction error (loss)
     policies, preds, _ = policy_net(state_batch, action_batch_tensors)
-    # state_action_values = policies.gather(1, action_batch)
-
-    # # Q-learning not used here - EC!
-    # Compute V(s_{t+1}) for all next states.
-    # next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    # policiest, predt = target_net(non_final_next_states)
-    # next_state_values[non_final_mask] = policiest.max(1)[0].detach()
-    # Compute the expected Q values
-    # expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-    # Compute Huber loss
-    # loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
-
-    # predictive network:
     representations = representation_batch.reshape(BATCH_SIZE, -1)
     outputf = loss(representations, preds)
 
@@ -179,29 +164,8 @@ def get_screen():
     return prepscreen(screen).unsqueeze(0).to(device)
 
 
-def plot_durations():
-    plt.figure(2)
-    plt.clf()
-    durations_t = torch.tensor(episode_durations, dtype=torch.float)
-    plt.title('Training...')
-    plt.xlabel('Episode')
-    plt.ylabel('Duration')
-    plt.plot(durations_t.numpy())
-    # Take 100 episode averages and plot them too
-    if len(durations_t) >= 100:
-        means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-        means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy())
-
-    plt.pause(0.001)  # pause a bit so that plots are updated
-    if is_ipython:
-        display.clear_output(wait=True)
-        display.display(plt.gcf())
-
-
-
 # main script:
-memory = ReplayMemory(10000)
+memory = ReplayMemory(MEM_SIZE)
 policy_net = CNN().to(device)
 target_net = CNN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
@@ -215,33 +179,25 @@ steps_done = 0
 for i_episode in range(num_episodes):
     # Initialize the environment and state
     env.reset()
-    # last_screen = get_screen()
-    # current_screen = get_screen()
-    # print(current_screen.shape, current_screen.max(), current_screen.min())
     # img1 = current_screen.squeeze(0).transpose(0,2).numpy()
     # print(img1.shape)
     # plt.imshow(img1)
     # plt.show()
-    # state = current_screen - last_screen
     state = get_screen()
     losst = 0
     for t in count():
-        env.render()
-        # Select and perform an action
-        # action = env.action_space.sample() # random action
-        # print(action)
-        # observation, reward, done, info = env.step(action)
+        # env.render()
+        # update esploration threshold
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
             math.exp(-1. * steps_done / EPS_DECAY)
         steps_done += 1
+        # select and perform an action
         action, representation = select_action(state, eps_threshold)
         # print(action.item())
         _, reward, done, _ = env.step(action.item())
-        reward = torch.tensor([reward], device=device)
+        # reward = torch.tensor([reward], device=device)
 
-        # Observe new state
-        # last_screen = current_screen
-        # current_screen = get_screen()
+        # observe new state
         if not done:
             next_state = get_screen()
         else:
@@ -258,26 +214,21 @@ for i_episode in range(num_episodes):
         if lossi is not None:
             losst = losst + lossi.item()
         if done:
-            episode_durations.append(t + 1)
-            # plot_durations()
-            print('Steps:', steps_done, 'eps_threshold:', eps_threshold, 'Loss in this episode:', losst)
+            episode_duration = t + 1
+            print('Steps: {:d}, eps_threshold: {:.2f}, loss: {:.2f}, Episode duration: {:d}'
+                .format(steps_done, eps_threshold, losst, episode_duration))
             losst = 0
             break
+
     # Update the target network
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
+# final notes:
+torch.save(target_net.state_dict(), saved_model_filename) # save trained network
+env.close()
+print('Training complete, trained network saved as:', saved_model_filename)
 
 
 
-# # example simple plot:
-# for i_episode in range(10):
-#     observation = env.reset()
-#     for t in range(25):
-#         env.render()
-#         # print(observation)
-#         action = env.action_space.sample() # random action
-#         observation, reward, done, info = env.step(action)
-#         if done:
-#             print('Episode', i_episode+1, 'finished after {} timesteps'.format(t+1))
-#             break
+
