@@ -7,22 +7,12 @@
 # DEMO code from a pre-trained network
 
 import gym
-import math
-import random
-import numpy as np
 from itertools import count
-from PIL import Image
-import matplotlib
-import matplotlib.pyplot as plt
-from collections import namedtuple
 from termcolor import colored
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 import torchvision.transforms as T
-
 import sys
 
 game = 'Breakout-v0'
@@ -33,23 +23,12 @@ print('Demo using pre-trained network:', model_file_name)
 print('Usage: python3 demo_trained.py trained_model.pth')
 numactions = len(env.unwrapped.get_action_meanings())
 
-# set up matplotlib
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
-
-plt.ion()
-
 # if gpu is to be used
 device = torch.device("cpu")
 
+num_episodes = 50
 
-steps_done = 0
-num_episodes = 300
-episode_durations = []
-prepscreen = T.Compose([#T.ToPILImage(),
-                    #T.Resize(40, interpolation=Image.CUBIC),
-                    T.ToTensor()])
+prepscreen = T.Compose([T.ToTensor()])
 
 
 class CNN(nn.Module):
@@ -83,6 +62,8 @@ class CNN(nn.Module):
 
 
 def select_action(state, threshold):
+    with torch.no_grad():
+            policy, _, _  = trained_net(state, no_op_action)
     return policy.max(1)[1].view(1, 1), representation
 
 
@@ -92,9 +73,9 @@ def get_screen():
 
 
 # main script:
-target_net = CNN().to(device)
-target_net.load_state_dict(torch.load(model_file_name))
-target_net.eval()
+trained_net = CNN().to(device)
+trained_net.load_state_dict(torch.load(model_file_name))
+trained_net.eval()
 
 for i_episode in range(num_episodes):
     observation = env.reset()
@@ -106,4 +87,7 @@ for i_episode in range(num_episodes):
         if done:
             print('Episode', i_episode+1, 'finished after {} timesteps'.format(t+1))
             break
+
+env.close()
+print('Finished presenting demo')
 
