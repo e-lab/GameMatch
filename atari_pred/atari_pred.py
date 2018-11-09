@@ -10,10 +10,9 @@ import random
 import numpy as np
 from itertools import count
 from PIL import Image
-import matplotlib
-import matplotlib.pyplot as plt
 from collections import namedtuple
 from termcolor import colored
+import argparse
 
 import torch
 import torch.nn as nn
@@ -21,38 +20,33 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 
+# parse arguments:
+parser = argparse.ArgumentParser(description="Training RL with predictive networks")
+parser.add_argument('--batch_size', type=int, default=256, help='training batch size')
+parser.add_argument('--eps_start', type=float, default=0.9, help='')
+parser.add_argument('--eps_end', type=float, default=0.05, help='')
+parser.add_argument('--eps_decay', type=int, default=15000, help='')
+parser.add_argument('--target_update', type=int, default=10, help='')
+parser.add_argument('--mem_size', type=int, default=20000, help='replay memory size')
+parser.add_argument('--num_episodes', type=int, default=300, help='number games to play')
+parser.add_argument('--saved_model_filename', type=str, default='saved_model.pth', help='save file name')
+args = parser.parse_args()
+
 game = 'Breakout-v0'
 env = gym.make(game)
 print(colored('\nPlaying game:', 'green'), game)
 print(colored('available actions:', 'red'), env.unwrapped.get_action_meanings(), '\n')
 numactions = len(env.unwrapped.get_action_meanings())
 
-# set up matplotlib
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
-
-plt.ion()
+np.set_printoptions(precision=3)
 
 # if gpu is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-np.set_printoptions(precision=3)
 # set up a tensor 1-hot for the action 0 = NOOP:
 no_op_action = torch.zeros(numactions, device=device, dtype=torch.float)
 no_op_action[0] = 1.
 
-
-BATCH_SIZE = 256
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 10000
-TARGET_UPDATE = 10
-MEM_SIZE = 10000
-steps_done = 0
-num_episodes = 200
-episode_durations = []
-saved_model_filename = 'saved_model.pth'
 
 prepscreen = T.Compose([T.ToTensor()])
 Transition = namedtuple('Transition',
@@ -84,21 +78,19 @@ class CNN(nn.Module):
 
     def __init__(self):
         super(CNN, self).__init__()
-        self.maxp = nn.MaxPool2d(4)
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=2)
-        self.bn3 = nn.BatchNorm2d(32)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=8, stride=4)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=2)
+        self.bn3 = nn.BatchNorm2d(64)
         # self.conv4 = nn.Conv2d(32, 32, kernel_size=3, stride=2)
         # self.bn4 = nn.BatchNorm2d(32)
-        self.predp = nn.Linear(32*5*3, 32*5*3) # this predicts next representation from prev representation
-        self.preda = nn.Linear(numactions, 32*5*3) # this predicts next representation from prev action
-        self.policy = nn.Linear(32*5*3, numactions) # this generates action
+        self.predp = nn.Linear(64*11*8, 64*11*8) # this predicts next representation from prev representation
+        self.preda = nn.Linear(numactions, 64*11*8) # this predicts next representation from prev action
+        self.policy = nn.Linear(64*11*8, numactions) # this generates action
 
     def forward(self, x, a): # inputs are: x = frame, a = action
-        x = self.maxp(x)
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
@@ -112,14 +104,14 @@ class CNN(nn.Module):
 
 def one_hot_convert(x): # convert action vector to 1-hot vector
     converted = torch.zeros([x.size(0), numactions], dtype=torch.float)
-    converted[np.arange(BATCH_SIZE), x.squeeze(1)] = 1.
+    converted[np.arange(args.batch_size), x.squeeze(1)] = 1.
     return converted
 
 
 def optimize_model():
-    if len(memory) < BATCH_SIZE:
+    if len(memory) < args.batch_size:
         return
-    transitions = memory.sample(BATCH_SIZE)
+    transitions = memory.sample(args.batch_size)
     # Transpose the batch (see http://stackoverflow.com/a/19343/3343043 for
     # detailed explanation).
     batch = Transition(*zip(*transitions))
@@ -137,7 +129,7 @@ def optimize_model():
 
     # compute predictions and prediction error (loss)
     policies, preds, _ = policy_net(state_batch, action_batch_tensors)
-    representations = representation_batch.reshape(BATCH_SIZE, -1)
+    representations = representation_batch.reshape(args.batch_size, -1)
     outputf = loss(representations, preds)
 
     # Optimize the model
@@ -165,7 +157,7 @@ def get_screen():
 
 
 # main script:
-memory = ReplayMemory(MEM_SIZE)
+memory = ReplayMemory(args.mem_size)
 policy_net = CNN().to(device)
 target_net = CNN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
@@ -176,7 +168,7 @@ optimizer = optim.RMSprop(policy_net.parameters())
 
 steps_done = 0
 
-for i_episode in range(num_episodes):
+for i_episode in range(args.num_episodes):
     # Initialize the environment and state
     env.reset()
     # img1 = current_screen.squeeze(0).transpose(0,2).numpy()
@@ -186,24 +178,26 @@ for i_episode in range(num_episodes):
     state = get_screen()
     losst = 0
     for t in count():
-        # env.render()
+        if device == 'cpu':
+            env.render()
         # update esploration threshold
-        eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-            math.exp(-1. * steps_done / EPS_DECAY)
+        eps_threshold = args.eps_end + (args.eps_start - args.eps_end) * \
+            math.exp(-1. * steps_done / args.eps_decay)
         steps_done += 1
         # select and perform an action
         action, representation = select_action(state, eps_threshold)
         # print(action.item())
         _, reward, done, _ = env.step(action.item())
-        # reward = torch.tensor([reward], device=device)
+        reward = torch.tensor([reward], device=device)
 
         # observe new state
-        if not done:
-            next_state = get_screen()
-        else:
-            next_state = None
+        # if not done:
+        next_state = get_screen()
+        # else:
+            # next_state = None
 
         # Store the transition in memory
+        # print(state, action, representation, next_state, reward)
         memory.push(state, action, representation, next_state, reward)
 
         # Move to the next state
@@ -221,10 +215,12 @@ for i_episode in range(num_episodes):
             break
 
     # Update the target network
-    if i_episode % TARGET_UPDATE == 0:
+    if i_episode % args.target_update == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
 # final notes:
+target_net.to("cpu")
+target_net.eval()
 torch.save(target_net.state_dict(), saved_model_filename) # save trained network
 env.close()
 print('Training complete, trained network saved as:', saved_model_filename)
