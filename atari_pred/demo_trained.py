@@ -46,20 +46,19 @@ class CNN(nn.Module):
 
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=2)
-        self.bn3 = nn.BatchNorm2d(32)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=8, stride=4)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=2)
+        self.bn3 = nn.BatchNorm2d(64)
         # self.conv4 = nn.Conv2d(32, 32, kernel_size=3, stride=2)
         # self.bn4 = nn.BatchNorm2d(32)
-        self.predp = nn.Linear(32*5*3, 32*5*3) # this predicts next representation from prev representation
-        self.preda = nn.Linear(numactions, 32*5*3) # this predicts next representation from prev action
-        self.policy = nn.Linear(32*5*3, numactions) # this generates action
+        self.predp = nn.Linear(64*11*8, 64*11*8) # this predicts next representation from prev representation
+        self.preda = nn.Linear(numactions, 64*11*8) # this predicts next representation from prev action
+        self.policy = nn.Linear(64*11*8, numactions) # this generates action
 
     def forward(self, x, a): # inputs are: x = frame, a = action
-        x = self.maxp(x)
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
@@ -69,7 +68,7 @@ class CNN(nn.Module):
         policy = self.policy(x.view(x.size(0), -1))
         pred = self.predp(x.view(x.size(0), -1)) + self.preda(a)
         return policy, pred, representation
-
+        
 
 def select_action(state, threshold):
     sample = random.random()
