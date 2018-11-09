@@ -6,36 +6,46 @@
 #
 # DEMO code from a pre-trained network
 
+import sys
 import gym
+import random
 from itertools import count
 from termcolor import colored
+import argparse
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.transforms as T
-import sys
+
+# parse arguments:
+parser = argparse.ArgumentParser(description="Training RL with predictive networks - demo")
+parser.add_argument('--eps_end', type=float, default=0.05, help='')
+parser.add_argument('--num_episodes', type=int, default=50, help='number games to play')
+parser.add_argument('--model', type=str, default='saved_model.pth', help='trained model to load')
+args = parser.parse_args()
 
 game = 'Breakout-v0'
 env = gym.make(game)
 print(colored('\nPlaying game:', 'green'), game)
-model_file_name = sys.argv[1]
-print('Demo using pre-trained network:', model_file_name)
+print('Demo using pre-trained network:', args.model)
 print('Usage: python3 demo_trained.py trained_model.pth')
 numactions = len(env.unwrapped.get_action_meanings())
 
 # if gpu is to be used
 device = torch.device("cpu")
 
-num_episodes = 50
-
 prepscreen = T.Compose([T.ToTensor()])
+
+# set up a tensor 1-hot for the action 0 = NOOP:
+no_op_action = torch.zeros(numactions, device=device, dtype=torch.float)
+no_op_action[0] = 1.
 
 
 class CNN(nn.Module):
 
     def __init__(self):
         super(CNN, self).__init__()
-        self.maxp = nn.MaxPool2d(4)
         self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
         self.bn1 = nn.BatchNorm2d(16)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2)
@@ -62,31 +72,62 @@ class CNN(nn.Module):
 
 
 def select_action(state, threshold):
+    sample = random.random()
     with torch.no_grad():
-            policy, _, _  = trained_net(state, no_op_action)
-    return policy.max(1)[1].view(1, 1), representation
+            policy, pred,representation  = trained_net(state, no_op_action)
+    if sample > threshold:
+            return policy.max(1)[1].view(1, 1)
+    else:
+        return torch.tensor([[random.randrange(2)]], device=device, dtype=torch.long)
 
 
 def get_screen():
     screen = env.render(mode='rgb_array') # size: (3, 210, 160)
     return prepscreen(screen).unsqueeze(0).to(device)
 
+class FireResetEnv(gym.Wrapper):
+    def __init__(self, env):
+        """Take action on reset for environments that are fixed until firing."""
+        gym.Wrapper.__init__(self, env)
+        assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
+        assert len(env.unwrapped.get_action_meanings()) >= 3
+
+    def _reset(self, **kwargs):
+        self.env.reset(**kwargs)
+        obs, _, done, _ = self.env.step(1)
+        if done:
+            self.env.reset(**kwargs)
+        obs, _, done, _ = self.env.step(2)
+        if done:
+            self.env.reset(**kwargs)
+        return obs
+
 
 # main script:
 trained_net = CNN().to(device)
-trained_net.load_state_dict(torch.load(model_file_name))
+trained_net.load_state_dict(torch.load(args.model))
 trained_net.eval()
 
-for i_episode in range(num_episodes):
-    observation = env.reset()
+for i_episode in range(args.num_episodes):
+    env.reset()
+    # _,_,done,_ = env.step(1)
+    # if done:
+    #     env.reset()
+    # _,_,done,_ = env.step(2)
+    # if done:
+    #     env.reset()
     for t in count():
-        env.render()
-        # print(observation)
-        action = env.action_space.sample() # random action
-        observation, reward, done, info = env.step(action)
+        if device == 'cpu':
+            env.render()
+        state = get_screen()
+        action = select_action(state, args.eps_end)
+        # print(t,action)
+        _, reward, done, info = env.step(action)
         if done:
             print('Episode', i_episode+1, 'finished after {} timesteps'.format(t+1))
             break
+        if t > 1000:
+            break 
 
 env.close()
 print('Finished presenting demo')
