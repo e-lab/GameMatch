@@ -29,12 +29,11 @@ parser.add_argument('--eps_decay', type=int, default=200, help='')
 parser.add_argument('--target_update', type=int, default=10, help='')
 parser.add_argument('--mem_size', type=int, default=10000, help='replay memory size')
 parser.add_argument('--num_episodes', type=int, default=100, help='number games to play')
-parser.add_argument('--saved_model_filename', type=str, default='saved_model.pth', help='save file name')
 args = parser.parse_args()
 
-game = 'CartPole-v0'
-env = gym.make(game).unwrapped
-print(colored('\nPlaying game:', 'green'), game)
+game_name = 'CartPole-v0'
+env = gym.make(game_name).unwrapped
+print(colored('\nPlaying game:', 'green'), game_name)
 numactions = 2
 
 np.set_printoptions(precision=3)
@@ -250,9 +249,10 @@ for i_episode in range(args.num_episodes):
 # final notes:
 target_net.to("cpu")
 target_net.eval()
-torch.save(target_net.state_dict(), args.saved_model_filename) # save trained network
+saved_model_filename = str(game_name) + '_model.pth'
+torch.save(target_net.state_dict(), saved_model_filename) # save trained network
 env.close()
-print('Training complete, trained network saved as:', args.saved_model_filename)
+print('Training complete, trained network saved as:', saved_model_filename)
 
 
 
