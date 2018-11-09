@@ -178,7 +178,7 @@ for i_episode in range(args.num_episodes):
     state = get_screen()
     losst = 0
     for t in count():
-        if device == 'cpu':
+        if device == 'cpu': 
             env.render()
         # update esploration threshold
         eps_threshold = args.eps_end + (args.eps_start - args.eps_end) * \
@@ -221,9 +221,9 @@ for i_episode in range(args.num_episodes):
 # final notes:
 target_net.to("cpu")
 target_net.eval()
-torch.save(target_net.state_dict(), saved_model_filename) # save trained network
+torch.save(target_net.state_dict(), args.saved_model_filename) # save trained network
 env.close()
-print('Training complete, trained network saved as:', saved_model_filename)
+print('Training complete, trained network saved as:', args.saved_model_filename)
 
 
 

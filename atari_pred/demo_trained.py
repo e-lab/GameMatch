@@ -117,8 +117,7 @@ for i_episode in range(args.num_episodes):
     # if done:
     #     env.reset()
     for t in count():
-        if device == 'cpu':
-            env.render()
+        env.render()
         state = get_screen()
         action = select_action(state, args.eps_end)
         # print(t,action)
