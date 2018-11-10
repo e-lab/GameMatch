@@ -208,8 +208,8 @@ for i_episode in range(args.num_episodes):
             losst = losst + lossi.item()
         if done:
             episode_duration = t + 1
-            print('Steps: {:d}, eps_threshold: {:.2f}, loss: {:.2f}, Episode duration: {:d}'
-                .format(steps_done, eps_threshold, losst, episode_duration))
+            print('Episode: {:d}, eps_threshold: {:.2f}, loss: {:.2f}, Episode duration: {:d}'
+                .format(i_episode, eps_threshold, losst, episode_duration))
             losst = 0
             break
 
