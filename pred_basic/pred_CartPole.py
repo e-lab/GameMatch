@@ -22,13 +22,13 @@ import torchvision.transforms as T
 
 # parse arguments:
 parser = argparse.ArgumentParser(description="Training RL with predictive networks")
-parser.add_argument('--batch_size', type=int, default=128, help='training batch size')
+parser.add_argument('--batch_size', type=int, default=256, help='training batch size')
 parser.add_argument('--eps_start', type=float, default=0.9, help='')
 parser.add_argument('--eps_end', type=float, default=0.05, help='')
 parser.add_argument('--eps_decay', type=int, default=200, help='')
 parser.add_argument('--target_update', type=int, default=10, help='')
-parser.add_argument('--mem_size', type=int, default=10000, help='replay memory size')
-parser.add_argument('--num_episodes', type=int, default=100, help='number games to play')
+parser.add_argument('--mem_size', type=int, default=20000, help='replay memory size')
+parser.add_argument('--num_episodes', type=int, default=300, help='number games to play')
 args = parser.parse_args()
 
 game_name = 'CartPole-v0'
@@ -75,29 +75,48 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-class CNN(nn.Module):
-
+class target_NN(nn.Module):
+# fixed and random target network: from frame to representation and action/policy
     def __init__(self):
-        super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
+        super(target_NN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=8, stride=4)
         self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=4, stride=2)
         self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        self.bn3 = nn.BatchNorm2d(32)
-        self.predp = nn.Linear(448, 448) # this predicts next representation from prev representation
-        self.preda = nn.Linear(numactions, 448) # this predicts next representation from prev action
-        self.policy = nn.Linear(448, numactions) # this generates action
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        self.policy = nn.Linear(384, numactions) # this generates action
+
+    def forward(self, x): # inputs are: x = frame
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        representation = x.clone() # output representation of network
+        # print(x.size())
+        probs = self.policy(x.view(x.size(0), -1))
+        return probs, representation
+
+
+class predict_NN(nn.Module):
+# predictor network: from frame, action pair --> next representation
+    def __init__(self):
+        super(predict_NN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=8, stride=4)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=4, stride=2)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        self.preda = nn.Linear(numactions, 384) # this predicts next representation from prev action
+        self.predp = nn.Linear(384, 384) # this predicts next representation from prev representation
 
     def forward(self, x, a): # inputs are: x = frame, a = action
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
-        representation = x # output representation of network
         # print(x.size())
-        policy = self.policy(x.view(x.size(0), -1))
         pred = self.predp(x.view(x.size(0), -1)) + self.preda(a)
-        return policy, pred, representation
+        return pred
 
 
 def one_hot_convert(x): # convert action vector to 1-hot vector
@@ -126,15 +145,15 @@ def optimize_model():
     # reward_batch = torch.cat(batch.reward)
 
     # compute predictions and prediction error (loss)
-    policies, preds, _ = policy_net(state_batch, action_batch_tensors)
+    preds = predict_net(state_batch, action_batch_tensors)
     representations = representation_batch.reshape(args.batch_size, -1)
     outputf = loss(representations, preds)
 
     # Optimize the model
     optimizer.zero_grad()
     outputf.backward()
-    # for param in policy_net.parameters():
-        # param.grad.data.clamp_(-1, 1)
+    for param in predict_net.parameters():
+        param.grad.data.clamp_(-1, 1)
     optimizer.step()
     return outputf
 
@@ -142,9 +161,9 @@ def optimize_model():
 def select_action(state, threshold):
     sample = random.random()
     with torch.no_grad():
-            policy, pred,representation  = policy_net(state, no_op_action)
+            probs, representation  = target_net(state)
     if sample > threshold:
-            return policy.max(1)[1].view(1, 1), representation
+            return probs.max(1)[1].view(1, 1), representation
     else:
         return torch.tensor([[random.randrange(2)]], device=device, dtype=torch.long), representation
 
@@ -186,13 +205,12 @@ def get_screen():
 
 # main script:
 memory = ReplayMemory(args.mem_size)
-policy_net = CNN().to(device)
-target_net = CNN().to(device)
-target_net.load_state_dict(policy_net.state_dict())
+target_net = target_NN().to(device)
+predict_net = predict_NN().to(device)
 target_net.eval()
 
 loss = nn.MSELoss()
-optimizer = optim.RMSprop(policy_net.parameters())
+optimizer = optim.RMSprop(predict_net.parameters())
 
 steps_done = 0
 
@@ -209,8 +227,8 @@ for i_episode in range(args.num_episodes):
         if device == 'cpu': 
             env.render()
         # update esploration threshold
-        eps_threshold = args.eps_end + (args.eps_start - args.eps_end) * \
-            math.exp(-1. * steps_done / args.eps_decay)
+        eps_threshold = 0.05#args.eps_end + (args.eps_start - args.eps_end) * \
+            # math.exp(-1. * steps_done / args.eps_decay)
         steps_done += 1
         # select and perform an action
         action, representation = select_action(state, eps_threshold)
@@ -219,13 +237,12 @@ for i_episode in range(args.num_episodes):
         reward = torch.tensor([reward], device=device)
 
         # observe new state
-        # if not done:
-        next_state = get_screen()
-        # else:
-            # next_state = None
+        if not done:
+            next_state = get_screen()
+        else:
+            next_state = None
 
         # Store the transition in memory
-        # print(state, action, representation, next_state, reward)
         memory.push(state, action, representation, next_state, reward)
 
         # Move to the next state
@@ -237,14 +254,11 @@ for i_episode in range(args.num_episodes):
             losst = losst + lossi.item()
         if done:
             episode_duration = t + 1
-            print('Steps: {:d}, eps_threshold: {:.2f}, loss: {:.2f}, Episode duration: {:d}'
-                .format(steps_done, eps_threshold, losst, episode_duration))
+            print('Episode: {:d}, eps_threshold: {:.2f}, loss: {:.2f}, Episode duration: {:d}'
+                .format(i_episode, eps_threshold, losst, episode_duration))
             losst = 0
             break
 
-    # Update the target network
-    if i_episode % args.target_update == 0:
-        target_net.load_state_dict(policy_net.state_dict())
 
 # final notes:
 target_net.to("cpu")
