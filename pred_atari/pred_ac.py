@@ -7,6 +7,7 @@
 # Step 3: step play: a_t --game--> f_t+1 --CNN1--> e_t+1
 # Step 4: minimize ||e_t+1 - e^_t+1||
 #
+# inspired by: https://github.com/pytorch/examples/blob/master/reinforcement_learning/actor_critic.py
 
 import argparse
 import gym
