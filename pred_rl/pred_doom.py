@@ -108,8 +108,7 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-class CNN1(nn.Module):
-# predictive network
+class CNN1(nn.Module): # encoding network
     def __init__(self):
         super(CNN1, self).__init__()
         self.conv1 = nn.Conv2d(1, 8, kernel_size=6, stride=3)
@@ -140,8 +139,7 @@ class CNN1(nn.Module):
 #         return self.fc2(x)
 
 
-class Pred_NN(nn.Module):
-# predictive network
+class Pred_NN(nn.Module): # predictive network
     def __init__(self, numactions):
         super(Pred_NN, self).__init__()
         self.decoder_r = nn.Linear(128, 128)
@@ -152,8 +150,7 @@ class Pred_NN(nn.Module):
         return p
 
 
-class Policy_NN(nn.Module):
-# actor critic heads
+class Policy_NN(nn.Module): # actor critic heads
     def __init__(self, numactions):
         super(Policy_NN, self).__init__()
         self.action_head = nn.Linear(128, numactions)
@@ -180,6 +177,7 @@ def select_action(state):
     r = CNN_model(state)
     probs, state_value = policy_model(r)
     m = Categorical(probs)
+    # print(probs, state_value)
     action = m.sample()
     policy_model.saved_actions.append(SavedAction(m.log_prob(action), state_value))
     # Step 2: e_t, a_t --pred_net--> e^_t+1
@@ -188,7 +186,7 @@ def select_action(state):
     return action.item(), p
 
 
-def finish_episode():
+def learn_extrinsic():
     R = 0
     saved_actions = policy_model.saved_actions
     policy_losses = []
@@ -216,9 +214,10 @@ def finish_episode():
     del policy_model.saved_actions[:]
 
 
-def learn_pred(p, s):
+def learn_intrinsic(p, s):
     optimizer_pred.zero_grad()
-    loss = loss_pred(p, s) 
+    loss = loss_pred(p, s)
+    # loss.backward()
     optimizer_pred.step()
 
 
@@ -296,17 +295,36 @@ def main():
 
             print("Training...")
             game.new_episode()
-            state = preprocess(game.get_state().screen_buffer)
+            counter = 0
             for learning_step in trange(learning_steps_per_epoch, leave=False):
-                state = perform_learning_step(epoch, state)
+
+                counter += 1
+                # Step 1: frame f_t --CNN1--> embedding e_t --policy--> action a_t
+                # old_state = state
+                state = preprocess(game.get_state().screen_buffer)
+                action, pred = select_action(state)
+                # Step 2 is inside previous function
+                # Step 3: step play: a_t --game--> f_t+1 --CNN1--> e_t+1
+                reward = game.make_action(actions[action], frame_repeat)
+                policy_model.rewards.append(reward)
+                done = game.is_episode_finished()
+                # add to replay memory:
+                # memory.add_transition(old_state, action, state, done, reward)
+                # Step 4: minimize ||e_t+1 - e^_t+1||
+                learn_intrinsic(pred, CNN_model(state)) # Intrinsic training: prediction
+                
                 if game.is_episode_finished():
+                    # print('DONE', counter)
+                    counter = 0
+                    if counter > 2:
+                        learn_extrinsic() # Extrinsic training: A2C
                     score = game.get_total_reward()
                     train_scores.append(score)
-                    game.new_episode()
                     train_episodes_finished += 1
-                else:
-                    # record non terminal transition in replay memory
-                    memory.push(r_t, action, ps[0], ps[1], r_tp1, reward)
+                    game.new_episode()
+                # else:
+                    # record non terminal transition in replay memory:
+                    # memory.push(r_t, action, ps[0], ps[1], r_tp1, reward)
 
             print("%d training episodes played." % train_episodes_finished)
 
