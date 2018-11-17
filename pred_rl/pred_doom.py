@@ -19,6 +19,8 @@ import itertools as it
 from itertools import count
 from collections import namedtuple
 from termcolor import colored
+from time import time, sleep
+from tqdm import trange
 
 import torch
 import torch.nn as nn
@@ -59,7 +61,10 @@ eps = np.finfo(np.float32).eps.item() # a small number to avoid division by 0
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 # Training regime
+epochs = 20
+learning_steps_per_epoch = 2000
 test_episodes_per_epoch = 100
+replay_memory_size = 10000
 
 # Other parameters
 frame_repeat = 12
@@ -75,6 +80,38 @@ skip_learning = False
 config_file_path = "/usr/local/lib/python3.6/site-packages/vizdoom/scenarios/simpler_basic.cfg"
 # config_file_path = "../../scenarios/rocket_basic.cfg"
 # config_file_path = "../../scenarios/basic.cfg"
+
+
+
+class ReplayMemory:
+    def __init__(self, capacity):
+        channels = 1
+        state_shape = (capacity, channels, resolution[0], resolution[1])
+        self.s1 = np.zeros(state_shape, dtype=np.float32)
+        self.s2 = np.zeros(state_shape, dtype=np.float32)
+        self.a = np.zeros(capacity, dtype=np.int32)
+        self.r = np.zeros(capacity, dtype=np.float32)
+        self.isterminal = np.zeros(capacity, dtype=np.float32)
+
+        self.capacity = capacity
+        self.size = 0
+        self.pos = 0
+
+    def add_transition(self, s1, action, s2, isterminal, reward):
+        self.s1[self.pos, 0, :, :] = s1
+        self.a[self.pos] = action
+        if not isterminal:
+            self.s2[self.pos, 0, :, :] = s2
+        self.isterminal[self.pos] = isterminal
+        self.r[self.pos] = reward
+
+        self.pos = (self.pos + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
+
+    def get_sample(self, sample_size):
+        i = sample(range(0, self.size), sample_size)
+        return self.s1[i], self.a[i], self.s2[i], self.isterminal[i], self.r[i]
+
 
 
 class CNN1(nn.Module):
@@ -133,10 +170,8 @@ class Policy_NN(nn.Module):
 
     def forward(self, x):
         action_scores = self.action_head(x)
-        state_values = self.value_head(x).squeeze()
-        return F.softmax(action_scores, dim=-1), state_values
-
-
+        state_values = self.value_head(x)
+        return F.softmax(action_scores), state_values.squeeze(1)
 
 
 def one_hot_convert(x): # convert action vector to 1-hot vector
@@ -219,6 +254,9 @@ def preprocess(img):
 # Create Doom instance
 game = initialize_vizdoom(config_file_path)
 
+# Create replay memory which will store the transitions
+memory = ReplayMemory(capacity=replay_memory_size)
+
 # Action = which buttons are pressed
 n = game.get_available_buttons_size()
 actions = [list(a) for a in it.product([0, 1], repeat=n)]
@@ -236,42 +274,99 @@ policy_model = Policy_NN(numactions)
 optimizer_policy = optim.Adam(policy_model.parameters())
 
 
+def perform_learning_step(epoch, state):
+    # Step 1: frame f_t --CNN1--> embedding e_t --policy--> action a_t
+    old_state = state
+    state = preprocess(game.get_state().screen_buffer)
+    action, pred = select_action(state)
+    # Step 2 is inside previous function
+    # Step 3: step play: a_t --game--> f_t+1 --CNN1--> e_t+1
+    reward = game.make_action(actions[action], frame_repeat)
+    policy_model.rewards.append(reward)
+    done = game.is_episode_finished()
+    # add to replay memory:
+    memory.add_transition(old_state, action, state, done, reward)
+    # Step 4: minimize ||e_t+1 - e^_t+1||
+    learn_pred(pred, CNN_model(state))  # Intrinsic Reward used - prediction
+    return state
+
+
 def main():
-    running_reward = 10
-    for i_episode in count(1):
+    print("Starting the training!")
+    time_start = time()
+    if not skip_learning:
+        for epoch in range(epochs):
+            print("\nEpoch %d\n-------" % (epoch + 1))
+            train_episodes_finished = 0
+            train_scores = []
+
+            print("Training...")
+            game.new_episode()
+            state = preprocess(game.get_state().screen_buffer)
+            for learning_step in trange(learning_steps_per_epoch, leave=False):
+                state = perform_learning_step(epoch, state)
+                if game.is_episode_finished():
+                    score = game.get_total_reward()
+                    train_scores.append(score)
+                    game.new_episode()
+                    train_episodes_finished += 1
+
+            print("%d training episodes played." % train_episodes_finished)
+
+            train_scores = np.array(train_scores)
+
+            print("Results: mean: %.1f +/- %.1f," % (train_scores.mean(), train_scores.std()), \
+                  "min: %.1f," % train_scores.min(), "max: %.1f," % train_scores.max())
+
+            print("\nTesting...")
+            test_episode = []
+            test_scores = []
+            for test_episode in trange(test_episodes_per_epoch, leave=False):
+                game.new_episode()
+                while not game.is_episode_finished():
+                    state = preprocess(game.get_state().screen_buffer)
+                    action,_ = select_action(state)
+
+                    game.make_action(actions[action], frame_repeat)
+                r = game.get_total_reward()
+                test_scores.append(r)
+
+            test_scores = np.array(test_scores)
+            print("Results: mean: %.1f +/- %.1f," % (
+                test_scores.mean(), test_scores.std()), "min: %.1f" % test_scores.min(),
+                  "max: %.1f" % test_scores.max())
+
+            # print("Saving the network weigths to:", model_savefile)
+            # torch.save(model, model_savefile)
+
+            print("Total elapsed time: %.2f minutes" % ((time() - time_start) / 60.0))
+
+    game.close()
+    print("======================================")
+    print("Training finished. It's time to watch!")
+
+    # Reinitialize the game with window visible
+    game.set_window_visible(True)
+    game.set_mode(Mode.ASYNC_PLAYER)
+    game.init()
+
+    for _ in range(episodes_to_watch):
         game.new_episode()
-        state = preprocess(game.get_state().screen_buffer)
-        for t in range(10000):  # Don't infinite loop while learning
-            # Step 1: frame f_t --CNN1--> embedding e_t --policy--> action a_t
-            action, pred = select_action(state)
-            # Step 2 is inside previous function
-            # Step 3: step play: a_t --game--> f_t+1 --CNN1--> e_t+1
-            # state, reward, done, _ = env.step(action)
-            reward = game.make_action(actions[action], frame_repeat)
-            done = game.is_episode_finished()
-            # print(reward)
-            if args.render:
-                env.render()
-            policy_model.rewards.append(reward)
-            # Step 4: minimize ||e_t+1 - e^_t+1||
-            learn_pred(pred, CNN_model(state))  # Intrinsic Reward used - prediction
-            if done:
-                break
-            else:
-                state = preprocess(game.get_state().screen_buffer)
+        while not game.is_episode_finished():
+            state = preprocess(game.get_state().screen_buffer)
+            state = state.reshape([1, 1, resolution[0], resolution[1]])
+            action,_ = select_action(state)
 
-        # print(model.rewards)
-        running_reward = running_reward * 0.99 + t * 0.01
-        finish_episode() # Extrinsic Reward used
-        if i_episode % args.log_interval == 0:
-            print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
-                i_episode, t, running_reward))
-        # if running_reward > env.spec.reward_threshold:
-            # print("Solved! Running reward is now {} and "
-                  # "the last episode runs to {} time steps!".format(running_reward, t))
-            # break
+            # Instead of make_action(a, frame_repeat) in order to make the animation smooth
+            game.set_action(actions[action])
+            for _ in range(frame_repeat):
+                game.advance_action()
 
-    # game.close()
+        # Sleep between episodes
+        sleep(1.0)
+        score = game.get_total_reward()
+        print("Total score: ", score)
+
 
 if __name__ == '__main__':
     main()
