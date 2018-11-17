@@ -153,6 +153,7 @@ def learn_extrinsic():
 def learn_intrinsic(p, s):
     optimizer_pred.zero_grad()
     loss = loss_pred(p, s)
+    # loss.backward()
     optimizer_pred.step()
 
 
