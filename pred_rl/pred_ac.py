@@ -17,6 +17,7 @@ import gym
 import numpy as np
 from itertools import count
 from collections import namedtuple
+from termcolor import colored
 
 import torch
 import torch.nn as nn
@@ -37,7 +38,12 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('CartPole-v0')
+game_name = 'CartPole-v0' # Breakout, Pong, Enduro
+env = gym.make(game_name)
+print(colored('\nPlaying game:', 'green'), game_name)
+# print(colored('available actions:', 'red'), env.unwrapped.get_action_meanings(), '\n')
+numactions = 2 #len(env.unwrapped.get_action_meanings())
+
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
@@ -61,7 +67,7 @@ class Pred_NN(nn.Module):
     def __init__(self):
         super(Pred_NN, self).__init__()
         self.decoder_r = nn.Linear(128, 4)
-        self.decoder_action = nn.Linear(2, 4)
+        self.decoder_action = nn.Linear(numactions, 4)
 
     def forward(self, x, a):
         p = F.relu(self.decoder_r(x)) + F.relu(self.decoder_action(a)) # prediction of next state
@@ -72,7 +78,7 @@ class Policy_NN(nn.Module):
 # actor critic heads
     def __init__(self):
         super(Policy_NN, self).__init__()
-        self.action_head = nn.Linear(128, 2)
+        self.action_head = nn.Linear(128, numactions)
         self.value_head = nn.Linear(128, 1)
 
         self.saved_actions = []
@@ -96,6 +102,14 @@ policy_model = Policy_NN()
 optimizer = optim.Adam(policy_model.parameters(), lr=3e-2)
 
 
+def one_hot_convert(x): # convert action vector to 1-hot vector
+    # converted = torch.zeros([x.size(0), numactions], dtype=torch.float)
+    # converted[np.arange(args.batch_size), x] = 1.
+    converted = torch.zeros(numactions)
+    converted[x] = 1
+    return converted
+
+
 def select_action(state):
     state = torch.from_numpy(state).float() # turn state into tensor
     r = CNN_model(state)
@@ -104,7 +118,8 @@ def select_action(state):
     action = m.sample()
     policy_model.saved_actions.append(SavedAction(m.log_prob(action), state_value))
     # Step 2: e_t, a_t --pred_net--> e^_t+1
-    p = pred_model(r, probs)
+    actt = one_hot_convert(action) # convert to 1-hot
+    p = pred_model(r, actt)
     return action.item(), p
 
 
