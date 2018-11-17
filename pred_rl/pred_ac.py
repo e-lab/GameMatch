@@ -122,7 +122,7 @@ def select_action(state):
     return action.item(), p
 
 
-def finish_episode():
+def learn_extrinsic():
     R = 0
     saved_actions = policy_model.saved_actions
     policy_losses = []
@@ -150,7 +150,7 @@ def finish_episode():
     del policy_model.saved_actions[:]
 
 
-def learn_pred(p, s):
+def learn_intrinsic(p, s):
     optimizer_pred.zero_grad()
     loss = loss_pred(p, s) 
     optimizer_pred.step()
@@ -174,13 +174,13 @@ def main():
             # Step 4: minimize ||e_t+1 - e^_t+1||
             state = torch.from_numpy(state).float() # turn state into tensor
             state_t = CNN_model(state)
-            learn_pred(pred, state_t)  # Intrinsic Reward used - prediction
+            learn_intrinsic(pred, state_t)  # Intrinsic Reward used - prediction
             if done:
                 break
 
         # print(model.rewards)
         running_reward = running_reward * 0.99 + t * 0.01
-        finish_episode() # Extrinsic Reward used
+        learn_extrinsic() # Extrinsic Reward used
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
                 i_episode, t, running_reward))

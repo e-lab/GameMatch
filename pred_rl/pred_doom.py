@@ -81,37 +81,31 @@ config_file_path = "/usr/local/lib/python3.6/site-packages/vizdoom/scenarios/sim
 # config_file_path = "../../scenarios/rocket_basic.cfg"
 # config_file_path = "../../scenarios/basic.cfg"
 
+Transition = namedtuple('Transition',
+        ('state', 'action', 'log_prob', 'value', 'next_state', 'reward'))
+
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 
-class ReplayMemory:
+class ReplayMemory(object):
+
     def __init__(self, capacity):
-        channels = 1
-        state_shape = (capacity, channels, resolution[0], resolution[1])
-        self.s1 = np.zeros(state_shape, dtype=np.float32)
-        self.s2 = np.zeros(state_shape, dtype=np.float32)
-        self.a = np.zeros(capacity, dtype=np.int32)
-        self.r = np.zeros(capacity, dtype=np.float32)
-        self.isterminal = np.zeros(capacity, dtype=np.float32)
-
         self.capacity = capacity
-        self.size = 0
-        self.pos = 0
+        self.memory = []
+        self.position = 0
 
-    def add_transition(self, s1, action, s2, isterminal, reward):
-        self.s1[self.pos, 0, :, :] = s1
-        self.a[self.pos] = action
-        if not isterminal:
-            self.s2[self.pos, 0, :, :] = s2
-        self.isterminal[self.pos] = isterminal
-        self.r[self.pos] = reward
+    def push(self, *args):
+        """Saves a transition."""
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.position] = Transition(*args)
+        self.position = (self.position + 1) % self.capacity
 
-        self.pos = (self.pos + 1) % self.capacity
-        self.size = min(self.size + 1, self.capacity)
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
 
-    def get_sample(self, sample_size):
-        i = sample(range(0, self.size), sample_size)
-        return self.s1[i], self.a[i], self.s2[i], self.isterminal[i], self.r[i]
-
+    def __len__(self):
+        return len(self.memory)
 
 
 class CNN1(nn.Module):
@@ -310,6 +304,9 @@ def main():
                     train_scores.append(score)
                     game.new_episode()
                     train_episodes_finished += 1
+                else:
+                    # record non terminal transition in replay memory
+                    memory.push(r_t, action, ps[0], ps[1], r_tp1, reward)
 
             print("%d training episodes played." % train_episodes_finished)
 
