@@ -1,6 +1,9 @@
 # E. Culurciello, November 2018
 # Predictive neural networks for RL:
 #
+# This uses an Intrinsic Reward = prediction of future representations
+# as well as an Extrinsic Reward = A2C, actor-critic reward from game
+#
 # Algorithm:
 # Step 1: frame f_t --CNN1--> embedding e_t --policy--> action a_t
 # Step 2: e_t, a_t --pred_net--> e^_t+1
@@ -81,12 +84,16 @@ class Policy_NN(nn.Module):
         return F.softmax(action_scores, dim=-1), state_values
 
 
+# Models:
+# CNN generates representation / encoding:
 CNN_model = CNN1()
+# Intrinsic Reward - prediction:
 pred_model = Pred_NN()
-policy_model = Policy_NN()
-optimizer = optim.Adam(policy_model.parameters(), lr=3e-2)
 optimizer_pred = optim.Adam(pred_model.parameters(), lr=3e-2)
 loss_pred = nn.MSELoss()
+# Extrinsic Reward - A2C / actor-critic:
+policy_model = Policy_NN()
+optimizer = optim.Adam(policy_model.parameters(), lr=3e-2)
 
 
 def select_action(state):
@@ -151,13 +158,13 @@ def main():
                 env.render()
             policy_model.rewards.append(reward)
             # Step 4: minimize ||e_t+1 - e^_t+1||
-            learn_pred(pred, state)
+            learn_pred(pred, state)  # Intrinsic Reward used - prediction
             if done:
                 break
 
         # print(model.rewards)
         running_reward = running_reward * 0.99 + t * 0.01
-        finish_episode()
+        finish_episode() # Extrinsic Reward used
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
                 i_episode, t, running_reward))
