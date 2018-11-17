@@ -95,11 +95,11 @@ class Policy_NN(nn.Module):
 CNN_model = CNN1()
 # Intrinsic Reward - prediction:
 pred_model = Pred_NN()
-optimizer_pred = optim.Adam(pred_model.parameters(), lr=3e-2)
+optimizer_pred = optim.Adam(pred_model.parameters())
 loss_pred = nn.MSELoss()
 # Extrinsic Reward - A2C / actor-critic:
 policy_model = Policy_NN()
-optimizer = optim.Adam(policy_model.parameters(), lr=3e-2)
+optimizer_policy = optim.Adam(policy_model.parameters())
 
 
 def one_hot_convert(x): # convert action vector to 1-hot vector
@@ -142,11 +142,11 @@ def finish_episode():
         value_losses.append(F.smooth_l1_loss(value, torch.tensor([r])))
     # print('policy_losses: ', policy_losses)
     # print('value_losses: ', value_losses)
-    optimizer.zero_grad()
+    optimizer_policy.zero_grad()
     loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
     # print('loss', loss)
     loss.backward()
-    optimizer.step()
+    optimizer_policy.step()
     del policy_model.rewards[:]
     del policy_model.saved_actions[:]
 
