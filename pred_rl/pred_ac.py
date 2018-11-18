@@ -111,7 +111,7 @@ def one_hot_convert(x): # convert action vector to 1-hot vector
 
 
 def select_action(state):
-    r = CNN_model(state)
+    r = CNN_model(state).detach()
     probs, state_value = policy_model(r)
     m = Categorical(probs)
     action = m.sample()
@@ -153,7 +153,7 @@ def learn_extrinsic():
 def learn_intrinsic(p, s):
     optimizer_pred.zero_grad()
     loss = loss_pred(p, s)
-    # loss.backward()
+    loss.backward()
     optimizer_pred.step()
 
 
